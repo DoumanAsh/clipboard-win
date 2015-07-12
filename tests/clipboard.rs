@@ -6,7 +6,7 @@ use clipboard_win::*;
 fn set_clipboard_test() {
     let test_array = vec!["ololo", "1234", "1234567891234567891234567891234567891", "12345678912345678912345678912345678912"];
     for expected_string in test_array {
-        set_clipboard(expected_string);
+        assert!(set_clipboard(expected_string).is_ok());
 
         let result = get_clipboard();
         assert!(result.is_ok());

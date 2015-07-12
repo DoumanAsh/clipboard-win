@@ -2,9 +2,16 @@
 //!
 //! This crate provide simple means to operate with Windows clipboard.
 //!
-//! To use:
+//! # Example:
 //! ```
-//! extern crate clipboard_win;
+//! extern crate clipboard_win::*;
+//!
+//! use clipboard_win;
+//!
+//! fn main() {
+//!     println!("I set some clipboard text like a boss!");
+//!     set_clipboard("for my waifu!");
+//! }
 //! ```
 
 extern crate winapi;
@@ -21,35 +28,49 @@ use winapi::wchar_t; //u16
 use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
-use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock};
+use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
 use user32::{SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
 ///Set clipboard with text.
-pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
+///
+///Return result:
+///
+///* ```Ok``` Upon succesful set of text.
+///* ```Err``` Otherwise. See [Error codes](https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381%28v=vs.85%29.aspx)
+pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), u32> {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 66;
     let text = text.as_ref();
     unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return Err(GetLastError());
+        }
+
         //allocate buffer and copy string to it.
         let utf16_buff: Vec<u16> = text.encode_wide().collect();
         let len: usize = (utf16_buff.len()+1) * 2;
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
-        let lock = GlobalLock(handler) as *mut u16;
+        if handler.is_null() {
+            return Err(GetLastError());
+        }
+        else {
+            let lock = GlobalLock(handler) as *mut u16;
 
-        let len: usize = (len - 1) / 2;
-                                      //src,         dest, len
-        std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len);
-        let len: isize = len as isize;
-        *lock.offset(len) = 0;
+            let len: usize = (len - 1) / 2;
+                                          //src,         dest, len
+            std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len);
+            let len: isize = len as isize;
+            *lock.offset(len) = 0;
 
-        GlobalUnlock(handler);
+            GlobalUnlock(handler);
 
-        //Set new clipboard text.
-        OpenClipboard(std::ptr::null_mut());
-        EmptyClipboard();
-        SetClipboardData(format, handler);
-        CloseClipboard();
+            //Set new clipboard text.
+            EmptyClipboard();
+            SetClipboardData(format, handler);
+            CloseClipboard();
+        }
     }
+    Ok(())
 }
 
 ///Rust variant of strlen.
@@ -63,20 +84,33 @@ pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
 }
 
 ///Extracts clipboard content and convert it to String.
-pub fn get_clipboard() -> Result<String, std::string::FromUtf16Error> {
+///
+///Return result:
+///
+///* ```Ok``` Content of clipboard which is stored in ```String```.
+///* ```Err``` Error description.
+pub fn get_clipboard() -> Result<String, String> {
     let cf_unicodetext: UINT = 13;
-    let result: Result<String, std::string::FromUtf16Error>;
+    let result: Result<String, String>;
     unsafe {
-        OpenClipboard(std::ptr::null_mut());
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            result = Err(format!("Unable to open clipboard. Errno:{}", GetLastError()));
+        }
+        else {
+            let text_handler: HANDLE = GetClipboardData(cf_unicodetext);
+            if text_handler.is_null() {
+                result = Err(format!("Unable to get clipboard. Errno:{}", GetLastError()));
+            }
+            else {
+                let text_p = GlobalLock(text_handler) as *const wchar_t;
+                let len: usize = rust_strlen(text_p);
+                let text_s = std::slice::from_raw_parts(text_p, len);
 
-        let text_handler: HANDLE = GetClipboardData(cf_unicodetext);
-        let text_p = GlobalLock(text_handler) as *const wchar_t;
-        let len: usize = rust_strlen(text_p);
-        let text_s = std::slice::from_raw_parts(text_p, len);
-
-        result = String::from_utf16(text_s);
-        GlobalUnlock(text_handler);
-        CloseClipboard();
+                result = String::from_utf16(text_s).map_err(| err | format!("Failed to parse clipboard's text. Errno:{:?}", err));
+                GlobalUnlock(text_handler);
+                CloseClipboard();
+            }
+        }
     }
     result
 }
