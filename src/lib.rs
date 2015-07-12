@@ -1,4 +1,11 @@
-/// Clipboard WIN API
+//! Clipboard WIN API
+//!
+//! This crate provide simple means to operate with Windows clipboard.
+//!
+//! To use:
+//! ```
+//! extern crate clipboard_win;
+//! ```
 
 extern crate winapi;
 extern crate user32;
@@ -6,6 +13,7 @@ extern crate kernel32;
 extern crate num;
 
 //rust
+use std::os::windows::ffi::OsStrExt;
 
 //num
 use num::zero;
@@ -20,18 +28,20 @@ use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock};
 use user32::{SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
 ///Set clipboard with text.
-pub fn set_clipboard(text: &str) {
+pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 0x0042;
-    let len: usize = text.len() * 2;
+    let text = text.as_ref();
     unsafe {
         //allocate buffer and copy string to it.
+        let utf16_buff: Vec<u16> = text.encode_wide().collect();
+        let len: usize = (utf16_buff.len()+1) * 2;
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
-        let lock = GlobalLock(handler) as *mut u8;
+        let lock = GlobalLock(handler) as *mut u16;
 
                                       //src,         dest, len
-        std::ptr::copy_nonoverlapping(text.as_ptr(), lock, len);
-        std::ptr::write_bytes(lock.offset(len as isize), 0, 2);
+        std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len);
+        std::ptr::write_bytes(lock.offset((len) as isize), 0, 2);
 
         GlobalUnlock(handler);
 
@@ -45,7 +55,7 @@ pub fn set_clipboard(text: &str) {
 
 ///Rust variant of strlen.
 ///
-///@buff_p Must be valid non-NULL pointer.
+///* ```buff_p``` Must be valid non-NULL pointer.
 #[inline(always)]
 pub unsafe fn rust_strlen<T: PartialEq + num::traits::Zero>(buff_p: *const T) -> usize {
     let mut idx: isize = 0;

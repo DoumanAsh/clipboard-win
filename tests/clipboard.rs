@@ -5,7 +5,7 @@ use clipboard_win::*;
 #[test]
 fn set_clipboard_test() {
     let expected_string = "ololo";
-    set_clipboard(&expected_string);
+    set_clipboard(expected_string);
 
     let result = get_clipboard();
     assert!(result.is_ok());

@@ -1,7 +1,11 @@
 [package]
 name = "clipboard-win"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["DoumanAsh <custparasite@gmx.se>"]
+description = "Utilities to interact with clipboard."
+repository = "https://github.com/DoumanAsh/clipboard-win"
+documentation = "http://doumanash.github.io/clipboard-win/doc/clipboard_win/index.html"
+license = "MIT"
 
 [dependencies]
 libc = "*"
@@ -9,3 +13,8 @@ winapi = "*"
 user32-sys = "*"
 kernel32-sys = "*"
 num = "*"
+
+[lib]
+name = "clipboard_win"
+path = "src/lib.rs"
+test = false
