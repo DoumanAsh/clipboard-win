@@ -44,8 +44,8 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
         GlobalUnlock(handler);
 
         //Set new clipboard text.
-        EmptyClipboard();
         OpenClipboard(std::ptr::null_mut());
+        EmptyClipboard();
         SetClipboardData(format, handler);
         CloseClipboard();
     }
