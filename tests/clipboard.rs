@@ -15,6 +15,16 @@ fn set_clipboard_test() {
     println!("Expected: {}", expected_string);
     assert!(result == expected_string);
 
+    let expected_string = "ollo";
+    set_clipboard(expected_string);
+
+    let result = get_clipboard();
+    assert!(result.is_ok());
+    let result = result.unwrap();
+
+    println!("Clipboard: {}", result);
+    println!("Expected: {}", expected_string);
+    assert!(result == expected_string);
 }
 
 #[test]
