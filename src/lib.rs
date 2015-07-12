@@ -36,9 +36,10 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         let lock = GlobalLock(handler) as *mut u16;
 
+        let len: usize = (len - 1) / 2;
                                       //src,         dest, len
-        std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len-2);
-        let len: isize = (len-1) as isize/2;
+        std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len);
+        let len: isize = len as isize;
         *lock.offset(len) = 0;
 
         GlobalUnlock(handler);

@@ -4,27 +4,18 @@ use clipboard_win::*;
 
 #[test]
 fn set_clipboard_test() {
-    let expected_string = "ololo";
-    set_clipboard(expected_string);
+    let test_array = vec!["ololo", "1234", "1234567891234567891234567891234567891", "12345678912345678912345678912345678912"];
+    for expected_string in test_array {
+        set_clipboard(expected_string);
 
-    let result = get_clipboard();
-    assert!(result.is_ok());
-    let result = result.unwrap();
+        let result = get_clipboard();
+        assert!(result.is_ok());
+        let result = result.unwrap();
 
-    println!("Clipboard: {}", result);
-    println!("Expected: {}", expected_string);
-    assert!(result == expected_string);
-
-    let expected_string = "ollo";
-    set_clipboard(expected_string);
-
-    let result = get_clipboard();
-    assert!(result.is_ok());
-    let result = result.unwrap();
-
-    println!("Clipboard: {}", result);
-    println!("Expected: {}", expected_string);
-    assert!(result == expected_string);
+        println!("Clipboard: {}", result);
+        println!("Expected: {}", expected_string);
+        assert!(result == expected_string);
+    }
 }
 
 #[test]
