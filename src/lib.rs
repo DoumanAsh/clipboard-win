@@ -4,13 +4,13 @@
 //!
 //! # Example:
 //! ```
-//! extern crate clipboard_win::*;
+//! extern crate clipboard_win;
 //!
-//! use clipboard_win;
+//! use clipboard_win::*;
 //!
 //! fn main() {
 //!     println!("I set some clipboard text like a boss!");
-//!     set_clipboard("for my waifu!");
+//!     set_clipboard("for my waifu!").unwrap();
 //! }
 //! ```
 
@@ -51,6 +51,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
         let len: usize = (utf16_buff.len()+1) * 2;
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         if handler.is_null() {
+            CloseClipboard();
             return Err(GetLastError());
         }
         else {
@@ -94,6 +95,7 @@ pub fn get_clipboard() -> Result<String, String> {
     let result: Result<String, String>;
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
+            //Leave earlier as clipboard is closed at the end
             result = Err(format!("Unable to open clipboard. Errno:{}", GetLastError()));
         }
         else {
@@ -108,8 +110,8 @@ pub fn get_clipboard() -> Result<String, String> {
 
                 result = String::from_utf16(text_s).map_err(| err | format!("Failed to parse clipboard's text. Errno:{:?}", err));
                 GlobalUnlock(text_handler);
-                CloseClipboard();
             }
+            CloseClipboard();
         }
     }
     result
