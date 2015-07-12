@@ -28,10 +28,8 @@ fn get_clipboard_test() {
 #[test]
 fn strlen_test() {
     let test_vec = vec![1, 2, 0, 3, 4];
-    let test_str = "12345\0".to_string();
     unsafe {
         assert!(rust_strlen(test_vec.as_ptr()) == 2);
         assert!(rust_strlen(test_vec.as_ptr().offset(2)) == 0);
-        assert!(rust_strlen(test_str.as_ptr()) == test_str.len() - 1);
     }
 }

@@ -10,13 +10,10 @@
 extern crate winapi;
 extern crate user32;
 extern crate kernel32;
-extern crate num;
 
 //rust
 use std::os::windows::ffi::OsStrExt;
 
-//num
-use num::zero;
 //WINAPI
 //types
 use winapi::minwindef::{HGLOBAL, UINT};
@@ -30,7 +27,7 @@ use user32::{SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, 
 ///Set clipboard with text.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
     let format: UINT = 13; //unicode
-    let ghnd: UINT = 0x0042;
+    let ghnd: UINT = 66;
     let text = text.as_ref();
     unsafe {
         //allocate buffer and copy string to it.
@@ -57,9 +54,9 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) {
 ///
 ///* ```buff_p``` Must be valid non-NULL pointer.
 #[inline(always)]
-pub unsafe fn rust_strlen<T: PartialEq + num::traits::Zero>(buff_p: *const T) -> usize {
+pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
     let mut idx: isize = 0;
-    while *buff_p.offset(idx) != zero() { idx += 1; }
+    while *buff_p.offset(idx) != 0 { idx += 1; }
     idx as usize
 }
 
