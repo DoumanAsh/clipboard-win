@@ -3,6 +3,16 @@ extern crate clipboard_win;
 use clipboard_win::*;
 
 #[test]
+fn get_clipboard_formats_test() {
+    let clipboard_formats = get_clipboard_formats();
+
+    assert!(clipboard_formats.is_ok());
+
+    let clipboard_formats = clipboard_formats.unwrap();
+    println!("clipboard formats: {:?}", clipboard_formats);
+}
+
+#[test]
 fn get_clipboard_seq_num_test() {
     assert!(get_clipboard_seq_num().is_some());
 }

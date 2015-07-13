@@ -29,7 +29,7 @@ use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
 use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
-use user32::{GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+use user32::{EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
 ///Clipboard manager provides a primitive hack for console application to handle updates of
 ///clipboard. It uses ```get_clipboard_seq_num``` to determines whatever clipboard is updated or
@@ -197,4 +197,36 @@ pub fn get_clipboard() -> Result<String, String> {
         }
     }
     result
+}
+
+///Extracts available clipboard formats.
+///
+///Return result:
+///
+///* ```Ok``` Vector of available formats.
+///* ```Err``` Error description.
+pub fn get_clipboard_formats() -> Result<Vec<u32>, u32> {
+    let mut result: Vec<u32> = vec![];
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return Err(GetLastError());
+        }
+
+        let mut clip_format: u32 = EnumClipboardFormats(0);
+        while clip_format != 0 {
+            result.push(clip_format);
+            clip_format = EnumClipboardFormats(clip_format);
+        }
+
+        //Error check
+        let error = GetLastError();
+
+        if error != 0 {
+            return Err(error);
+        }
+
+        CloseClipboard();
+    }
+
+    Ok(result)
 }
