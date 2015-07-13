@@ -1,11 +1,12 @@
 [package]
 name = "clipboard-win"
 version = "0.5.1"
-authors = ["DoumanAsh <custparasite@gmx.se>"]
+authors = ["Douman <custparasite@gmx.se>"]
 description = "Utilities to interact with clipboard."
 repository = "https://github.com/DoumanAsh/clipboard-win"
 documentation = "http://doumanash.github.io/clipboard-win/doc/clipboard_win/index.html"
 license = "MIT"
+keywords = ["Windows", "winapi", "clipboard"]
 
 [dependencies]
 libc = "*"
