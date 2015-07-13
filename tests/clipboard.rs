@@ -3,6 +3,11 @@ extern crate clipboard_win;
 use clipboard_win::*;
 
 #[test]
+fn get_clipboard_seq_num_test() {
+    assert!(get_clipboard_seq_num().is_some());
+}
+
+#[test]
 fn set_clipboard_test() {
     let test_array = vec!["ololo", "1234", "1234567891234567891234567891234567891", "12345678912345678912345678912345678912"];
     for expected_string in test_array {

@@ -29,7 +29,20 @@ use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
 use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
-use user32::{SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+use user32::{GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+
+///GetClipboardSequenceNumber wrapper.
+///
+///Return result:
+///
+///* ```Some``` Upon successful retrieval of sequence number.
+///* ```None``` In case if you do not have access. It means that zero is returned by system.
+pub fn get_clipboard_seq_num() -> Option<u32> {
+    let result: u32 = unsafe { GetClipboardSequenceNumber() };
+    if result == 0 { return None; }
+
+    Some(result)
+}
 
 ///Set clipboard with text.
 ///
