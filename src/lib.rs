@@ -168,13 +168,13 @@ impl ClipboardManager {
 ///
 ///* ```Ok``` Upon succesful set of text.
 ///* ```Err``` Otherwise. See [Error codes](https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381%28v=vs.85%29.aspx)
-pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), u32> {
+pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 66;
     let text = text.as_ref();
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
-            return Err(GetLastError());
+            return WinResult::new(GetLastError());
         }
 
         //allocate buffer and copy string to it.
@@ -183,7 +183,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         if handler.is_null() {
             CloseClipboard();
-            return Err(GetLastError());
+            return WinResult::new(GetLastError());
         }
         else {
             let lock = GlobalLock(handler) as *mut u16;
@@ -202,7 +202,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
             CloseClipboard();
         }
     }
-    Ok(())
+    WinResult::new(0)
 }
 
 ///Rust variant of strlen.

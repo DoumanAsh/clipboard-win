@@ -1,7 +1,7 @@
 extern crate clipboard_win;
 
 use clipboard_win::*;
-use clipboard_win::wrapper::*;
+use clipboard_win::wrapper::get_clipboard_seq_num;
 
 #[test]
 fn win_error_test() {
