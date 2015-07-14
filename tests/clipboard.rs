@@ -1,6 +1,21 @@
 extern crate clipboard_win;
 
 use clipboard_win::*;
+use clipboard_win::wrapper::*;
+
+#[test]
+fn win_error_test() {
+    let result = WinResult::new(0);
+    assert!(result.is_ok());
+    println!("WinError({})={}", &result.errno(), result.errno_desc());
+
+    assert!(result == WinResult::new(0));
+    assert!(WinResult::new(1) != result);
+
+    let result = WinResult::new(666);
+    assert!(result.is_not_ok());
+    println!("WinError({})={}", &result.errno(), result.errno_desc());
+}
 
 #[test]
 fn get_clipboard_formats_test() {

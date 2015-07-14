@@ -1,4 +1,4 @@
-//! Clipboard WIN API
+//! Clipboard WinAPI
 //!
 //! This crate provide simple means to operate with Windows clipboard.
 //!
@@ -21,15 +21,77 @@ extern crate kernel32;
 //rust
 use std::os::windows::ffi::OsStrExt;
 
-//WINAPI
+//WinAPI
 //types
 use winapi::minwindef::{HGLOBAL, UINT};
 use winapi::wchar_t; //u16
 use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
-use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
-use user32::{GetClipboardFormatNameW, EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError, FormatMessageW};
+use user32::{GetClipboardFormatNameW, EnumClipboardFormats, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+
+//wrapper functions
+pub mod wrapper;
+use wrapper::{get_clipboard_seq_num};
+
+#[derive(Debug, Clone)]
+///Represents Windows result.
+pub struct WinResult {
+    errno: u32,
+}
+
+impl WinResult {
+    ///Constructs new error.
+    pub fn new(errno: u32) -> WinResult {
+        WinResult {
+            errno: errno,
+        }
+    }
+
+    #[inline(always)]
+    ///Returns ```true``` if result is ok
+    pub fn is_ok(&self) -> bool {
+        self.errno == 0
+    }
+
+    #[inline(always)]
+    ///Returns ```true``` if result is not ok
+    pub fn is_not_ok(&self) -> bool {
+        !self.is_ok()
+    }
+
+    #[inline(always)]
+    ///Returns extended error code. Should be used in case if result is not ok.
+    pub fn errno(&self) -> u32 {
+        self.errno
+    }
+
+    ///Returns description of WinAPI error code.
+    pub fn errno_desc(&self) -> String {
+        let mut format_buff: [u16; 300] = [0; 300];
+        let num_chars: u32 = unsafe { FormatMessageW(0x00000200 | 0x00001000 | 0x00002000,
+                                                     std::ptr::null(), self.errno,
+                                                     0, format_buff.as_mut_ptr(),
+                                                     200 as u32, std::ptr::null_mut()) };
+
+        if num_chars == 0 {
+            return "Unknown error".to_string();
+        }
+
+        String::from_utf16(&format_buff).unwrap_or("Unknown error".to_string())
+    }
+}
+
+impl PartialEq for WinResult {
+    fn eq(&self, right: &WinResult) -> bool {
+        self.errno == right.errno
+    }
+
+    fn ne(&self, right: &WinResult) -> bool {
+        self.errno != right.errno
+    }
+}
 
 ///Clipboard manager provides a primitive hack for console application to handle updates of
 ///clipboard. It uses ```get_clipboard_seq_num``` to determines whatever clipboard is updated or
@@ -45,7 +107,7 @@ pub struct ClipboardManager {
 impl ClipboardManager {
     fn default_ok(text: &String) -> () { println!("Clipboard content: {}", &text); }
     fn default_err(err_text: &String) -> () { println!("Failed to get clipboard. Reason:{}", &err_text); }
-    ///Construct new ClipboardManager with default settings
+    ///Constructs new ClipboardManager with default settings
     pub fn new() -> ClipboardManager {
         ClipboardManager {
             delay_ms: 100,
@@ -98,19 +160,6 @@ impl ClipboardManager {
             std::thread::sleep_ms(self.delay_ms);
         }
     }
-}
-
-///Wrapper around ```GetClipboardSequenceNumber```.
-///
-///# Return result:
-///
-///* ```Some``` Contains return value of ```GetClipboardSequenceNumber```.
-///* ```None``` In case if you do not have access. It means that zero is returned by system.
-pub fn get_clipboard_seq_num() -> Option<u32> {
-    let result: u32 = unsafe { GetClipboardSequenceNumber() };
-    if result == 0 { return None; }
-
-    Some(result)
 }
 
 ///Set clipboard with text.
