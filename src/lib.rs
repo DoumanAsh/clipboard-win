@@ -29,7 +29,7 @@ use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
 use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
-use user32::{EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
+use user32::{GetClipboardFormatNameW, EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
 ///Clipboard manager provides a primitive hack for console application to handle updates of
 ///clipboard. It uses ```get_clipboard_seq_num``` to determines whatever clipboard is updated or
@@ -102,7 +102,7 @@ impl ClipboardManager {
 
 ///Wrapper around ```GetClipboardSequenceNumber```.
 ///
-///Return result:
+///# Return result:
 ///
 ///* ```Some``` Contains return value of ```GetClipboardSequenceNumber```.
 ///* ```None``` In case if you do not have access. It means that zero is returned by system.
@@ -115,7 +115,7 @@ pub fn get_clipboard_seq_num() -> Option<u32> {
 
 ///Set clipboard with text.
 ///
-///Return result:
+///# Return result:
 ///
 ///* ```Ok``` Upon succesful set of text.
 ///* ```Err``` Otherwise. See [Error codes](https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381%28v=vs.85%29.aspx)
@@ -168,7 +168,7 @@ pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
 
 ///Extracts clipboard content and convert it to String.
 ///
-///Return result:
+///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Error description.
@@ -201,7 +201,7 @@ pub fn get_clipboard() -> Result<String, String> {
 
 ///Extracts available clipboard formats.
 ///
-///Return result:
+///# Return result:
 ///
 ///* ```Ok``` Vector of available formats.
 ///* ```Err``` Error description.
@@ -229,4 +229,35 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, u32> {
     }
 
     Ok(result)
+}
+
+///Returns format name based on it's code.
+///
+///# Note:
+///It is not possible to retrieve clipboard format name of predefined one.
+///
+///# Return result:
+///
+///* ```Some``` String which contains the format's name.
+///* ```None``` If format name is incorrect or predefined.
+pub fn get_format_name(format: u32) -> Option<String> {
+    let format_buff: [u16; 30] = [0; 30];
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return None;
+        }
+
+        let buff_p = format_buff.as_ptr() as *mut u16;
+
+        if GetClipboardFormatNameW(format, buff_p, 30) == 0 {
+            return None;
+        }
+
+        CloseClipboard();
+    }
+
+    if let Ok(format_name) = String::from_utf16(&format_buff) {
+        return Some(format_name);
+    }
+    None
 }

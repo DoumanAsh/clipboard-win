@@ -10,6 +10,11 @@ fn get_clipboard_formats_test() {
 
     let clipboard_formats = clipboard_formats.unwrap();
     println!("clipboard formats: {:?}", clipboard_formats);
+    for format in clipboard_formats {
+        if let Some(format_name) = get_format_name(format) {
+            println!("{}={}", format, format_name);
+        }
+    }
 }
 
 #[test]
