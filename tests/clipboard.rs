@@ -43,7 +43,7 @@ fn set_clipboard_test() {
     for expected_string in test_array {
         assert!(set_clipboard(expected_string).is_ok());
 
-        let result = get_clipboard();
+        let result = get_clipboard_string();
         assert!(result.is_ok());
         let result = result.unwrap();
 
@@ -55,7 +55,7 @@ fn set_clipboard_test() {
 
 #[test]
 fn get_clipboard_test() {
-    let result = get_clipboard();
+    let result = get_clipboard_string();
     assert!(result.is_ok());
 
     println!("Clipboard: {}", result.unwrap());

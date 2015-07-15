@@ -10,7 +10,7 @@
 //!
 //! fn main() {
 //!     println!("I set some clipboard text like a boss!");
-//!     set_clipboard("for my waifu!").unwrap();
+//!     set_clipboard("for my waifu!");
 //! }
 //! ```
 
@@ -35,24 +35,25 @@ use user32::{GetClipboardFormatNameW, EnumClipboardFormats, SetClipboardData, Em
 pub mod wrapper;
 use wrapper::{get_clipboard_seq_num};
 
+//Own error code
+pub const UTF16_PARSE_ERROR: u32 = 0xFFFFFFFF;
+
 #[derive(Debug, Clone)]
 ///Represents Windows result.
-pub struct WinResult {
-    errno: u32,
-}
+pub struct WinResult(u32);
 
 impl WinResult {
+    ///Custom errors
+
     ///Constructs new error.
     pub fn new(errno: u32) -> WinResult {
-        WinResult {
-            errno: errno,
-        }
+        WinResult(errno)
     }
 
     #[inline(always)]
     ///Returns ```true``` if result is ok
     pub fn is_ok(&self) -> bool {
-        self.errno == 0
+        self.0 == 0
     }
 
     #[inline(always)]
@@ -64,14 +65,24 @@ impl WinResult {
     #[inline(always)]
     ///Returns extended error code. Should be used in case if result is not ok.
     pub fn errno(&self) -> u32 {
-        self.errno
+        self.0
+    }
+
+    #[inline(always)]
+    fn internal_error(&self) -> Option<String> {
+        match self.0 {
+            UTF16_PARSE_ERROR => Some("Unable to parse content from UTF-16 data".to_string()),
+            _                 => None,
+        }
     }
 
     ///Returns description of WinAPI error code.
     pub fn errno_desc(&self) -> String {
+        if let Some(desc) = self.internal_error() { return desc; }
+
         let mut format_buff: [u16; 300] = [0; 300];
         let num_chars: u32 = unsafe { FormatMessageW(0x00000200 | 0x00001000 | 0x00002000,
-                                                     std::ptr::null(), self.errno,
+                                                     std::ptr::null(), self.0,
                                                      0, format_buff.as_mut_ptr(),
                                                      200 as u32, std::ptr::null_mut()) };
 
@@ -85,11 +96,11 @@ impl WinResult {
 
 impl PartialEq for WinResult {
     fn eq(&self, right: &WinResult) -> bool {
-        self.errno == right.errno
+        self.0 == right.0
     }
 
     fn ne(&self, right: &WinResult) -> bool {
-        self.errno != right.errno
+        self.0 != right.0
     }
 }
 
@@ -101,12 +112,12 @@ impl PartialEq for WinResult {
 pub struct ClipboardManager {
     delay_ms: u32,
     ok_fn: fn(&String) -> (),
-    err_fn: fn(&String) -> (),
+    err_fn: fn(&WinResult) -> (),
 }
 
 impl ClipboardManager {
     fn default_ok(text: &String) -> () { println!("Clipboard content: {}", &text); }
-    fn default_err(err_text: &String) -> () { println!("Failed to get clipboard. Reason:{}", &err_text); }
+    fn default_err(err_code: &WinResult) -> () { println!("Failed to get clipboard. Reason:{}", err_code.errno_desc()); }
     ///Constructs new ClipboardManager with default settings
     pub fn new() -> ClipboardManager {
         ClipboardManager {
@@ -131,8 +142,8 @@ impl ClipboardManager {
 
     ///Sets callback for failed retrieval of clipboard's text.
     ///
-    ///Error description is passed from ```get_clipboard()```
-    pub fn err_callback(&mut self, callback: fn(&String) -> ()) -> &mut ClipboardManager
+    ///Error code is passed from ```get_clipboard_string()```
+    pub fn err_callback(&mut self, callback: fn(&WinResult) -> ()) -> &mut ClipboardManager
      {
         self.err_fn = callback;
         self
@@ -151,9 +162,9 @@ impl ClipboardManager {
             let new_num = get_clipboard_seq_num().unwrap_or(0);
             if new_num != 0 && clip_num != new_num {
                 clip_num = new_num;
-                match get_clipboard() {
+                match get_clipboard_string() {
                     Ok(clip_text) => { (self.ok_fn)(&clip_text) },
-                    Err(err_text) => { (self.err_fn)(&err_text) },
+                    Err(err_code) => { (self.err_fn)(&err_code) },
                 }
             println!(">>>");
             }
@@ -164,17 +175,13 @@ impl ClipboardManager {
 
 ///Set clipboard with text.
 ///
-///# Return result:
-///
-///* ```Ok``` Upon succesful set of text.
-///* ```Err``` Otherwise. See [Error codes](https://msdn.microsoft.com/en-us/library/windows/desktop/ms681381%28v=vs.85%29.aspx)
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 66;
     let text = text.as_ref();
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
-            return WinResult::new(GetLastError());
+            return WinResult(GetLastError());
         }
 
         //allocate buffer and copy string to it.
@@ -183,7 +190,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         if handler.is_null() {
             CloseClipboard();
-            return WinResult::new(GetLastError());
+            return WinResult(GetLastError());
         }
         else {
             let lock = GlobalLock(handler) as *mut u16;
@@ -202,7 +209,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
             CloseClipboard();
         }
     }
-    WinResult::new(0)
+    WinResult(0)
 }
 
 ///Rust variant of strlen.
@@ -220,26 +227,26 @@ pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Error description.
-pub fn get_clipboard() -> Result<String, String> {
+///* ```Err``` Contains ```WinResult```.
+pub fn get_clipboard_string() -> Result<String, WinResult> {
     let cf_unicodetext: UINT = 13;
-    let result: Result<String, String>;
+    let result: Result<String, WinResult>;
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
             //Leave earlier as clipboard is closed at the end
-            result = Err(format!("Unable to open clipboard. Errno:{}", GetLastError()));
+            result = Err(WinResult(GetLastError()));
         }
         else {
             let text_handler: HANDLE = GetClipboardData(cf_unicodetext);
             if text_handler.is_null() {
-                result = Err(format!("Unable to get clipboard. Errno:{}", GetLastError()));
+                result = Err(WinResult(GetLastError()));
             }
             else {
                 let text_p = GlobalLock(text_handler) as *const wchar_t;
                 let len: usize = rust_strlen(text_p);
                 let text_s = std::slice::from_raw_parts(text_p, len);
 
-                result = String::from_utf16(text_s).map_err(| err | format!("Failed to parse clipboard's text. Errno:{:?}", err));
+                result = String::from_utf16(text_s).map_err(| _ | WinResult(UTF16_PARSE_ERROR));
                 GlobalUnlock(text_handler);
             }
             CloseClipboard();
@@ -254,11 +261,11 @@ pub fn get_clipboard() -> Result<String, String> {
 ///
 ///* ```Ok``` Vector of available formats.
 ///* ```Err``` Error description.
-pub fn get_clipboard_formats() -> Result<Vec<u32>, u32> {
+pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
     let mut result: Vec<u32> = vec![];
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
-            return Err(GetLastError());
+            return Err(WinResult(GetLastError()));
         }
 
         let mut clip_format: u32 = EnumClipboardFormats(0);
@@ -271,7 +278,7 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, u32> {
         let error = GetLastError();
 
         if error != 0 {
-            return Err(error);
+            return Err(WinResult(error));
         }
 
         CloseClipboard();
@@ -283,7 +290,7 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, u32> {
 ///Returns format name based on it's code.
 ///
 ///# Note:
-///It is not possible to retrieve clipboard format name of predefined one.
+///It is not possible to retrieve name of predefined clipboard format.
 ///
 ///# Return result:
 ///
@@ -308,5 +315,6 @@ pub fn get_format_name(format: u32) -> Option<String> {
     if let Ok(format_name) = String::from_utf16(&format_buff) {
         return Some(format_name);
     }
+
     None
 }
