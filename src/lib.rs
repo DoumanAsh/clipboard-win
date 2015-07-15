@@ -35,9 +35,6 @@ use user32::{GetClipboardFormatNameW, EnumClipboardFormats, SetClipboardData, Em
 pub mod wrapper;
 use wrapper::{get_clipboard_seq_num};
 
-//Own error code
-pub const UTF16_PARSE_ERROR: u32 = 0xFFFFFFFF;
-
 #[derive(Debug, Clone)]
 ///Represents Windows result.
 pub struct WinResult(u32);
@@ -68,18 +65,8 @@ impl WinResult {
         self.0
     }
 
-    #[inline(always)]
-    fn internal_error(&self) -> Option<String> {
-        match self.0 {
-            UTF16_PARSE_ERROR => Some("Unable to parse content from UTF-16 data".to_string()),
-            _                 => None,
-        }
-    }
-
     ///Returns description of WinAPI error code.
     pub fn errno_desc(&self) -> String {
-        if let Some(desc) = self.internal_error() { return desc; }
-
         let mut format_buff: [u16; 300] = [0; 300];
         let num_chars: u32 = unsafe { FormatMessageW(0x00000200 | 0x00001000 | 0x00002000,
                                                      std::ptr::null(), self.0,
@@ -246,7 +233,7 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
                 let len: usize = rust_strlen(text_p);
                 let text_s = std::slice::from_raw_parts(text_p, len);
 
-                result = String::from_utf16(text_s).map_err(| _ | WinResult(UTF16_PARSE_ERROR));
+                result = Ok(String::from_utf16_lossy(text_s));
                 GlobalUnlock(text_handler);
             }
             CloseClipboard();
@@ -312,9 +299,5 @@ pub fn get_format_name(format: u32) -> Option<String> {
         CloseClipboard();
     }
 
-    if let Ok(format_name) = String::from_utf16(&format_buff) {
-        return Some(format_name);
-    }
-
-    None
+    Some(String::from_utf16_lossy(&format_buff))
 }

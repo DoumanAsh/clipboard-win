@@ -1,7 +1,7 @@
 //!Provides direct wrappers to WinAPI functions.
 //!
-//!These functions omit calls to ```OpenClipboard``` and ```CloseClipboard``` to be more like
-//!wrappers. Due to that it is important that these function will be called upon need.
+//!These functions omit calls to ```OpenClipboard``` and ```CloseClipboard```.
+//!Due to that it is important that these function will be called by following requirements.
 
 extern crate user32;
 extern crate kernel32;
@@ -132,7 +132,7 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
             let len: usize = rust_strlen(text_p);
             let text_s = std::slice::from_raw_parts(text_p, len);
 
-            result = String::from_utf16(text_s).map_err(| _ | WinResult(super::UTF16_PARSE_ERROR));
+            result = Ok(String::from_utf16_lossy(text_s));
             GlobalUnlock(text_handler);
         }
     }
@@ -144,7 +144,7 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
 ///# Return result:
 ///
 ///* ```Ok``` Vector of available formats.
-///* ```Err``` Error description.
+///* ```Err``` Contains ```WinResult```.
 pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
     let mut result: Vec<u32> = vec![];
     unsafe {
@@ -185,9 +185,5 @@ pub fn get_format_name(format: u32) -> Option<String> {
 
     }
 
-    if let Ok(format_name) = String::from_utf16(&format_buff) {
-        return Some(format_name);
-    }
-
-    None
+    Some(String::from_utf16_lossy(&format_buff))
 }
