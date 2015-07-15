@@ -55,7 +55,7 @@ impl WinResult {
 
     #[inline(always)]
     ///Returns ```true``` if result is not ok
-    pub fn is_not_ok(&self) -> bool {
+    pub fn is_err(&self) -> bool {
         !self.is_ok()
     }
 
