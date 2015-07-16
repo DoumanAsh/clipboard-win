@@ -201,6 +201,8 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
 
 ///Rust variant of strlen.
 ///
+///# Parameters:
+///
 ///* ```buff_p``` Must be valid non-NULL pointer.
 #[inline(always)]
 pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
@@ -209,14 +211,28 @@ pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
     idx as usize
 }
 
-///Extracts clipboard content and convert it to String.
+#[inline(always)]
+///Extracts clipboard content in UTF16 and convert it to String.
 ///
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Contains ```WinResult```.
 pub fn get_clipboard_string() -> Result<String, WinResult> {
-    let cf_unicodetext: UINT = 13;
+    get_clipboard(13)
+}
+
+///Extracts clipboard content and convert it to String.
+///
+///# Parameters:
+///
+///* ```format``` clipboard format code.
+///
+///# Return result:
+///
+///* ```Ok``` Content of clipboard which is stored in ```String```.
+///* ```Err``` Contains ```WinResult```.
+pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
     let result: Result<String, WinResult>;
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
@@ -224,7 +240,7 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
             result = Err(WinResult(GetLastError()));
         }
         else {
-            let text_handler: HANDLE = GetClipboardData(cf_unicodetext);
+            let text_handler: HANDLE = GetClipboardData(format as UINT);
             if text_handler.is_null() {
                 result = Err(WinResult(GetLastError()));
             }
@@ -240,9 +256,7 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
         }
     }
     result
-}
-
-///Extracts available clipboard formats.
+}///Extracts available clipboard formats.
 ///
 ///# Return result:
 ///

@@ -13,7 +13,7 @@ fn win_error_test() {
     assert!(WinResult::new(1) != result);
 
     let result = WinResult::new(666);
-    assert!(result.is_not_ok());
+    assert!(result.is_err());
     println!("WinError({})={}", &result.errno(), result.errno_desc());
 }
 

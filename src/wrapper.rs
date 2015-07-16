@@ -115,15 +115,18 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
     WinResult(0)
 }
 
-
-///Wrapper around ```GetClipboardData```.
+///Wrapper around ```GetClipboardData``` with hardcoded UTF16 format.
 ///
 ///This function MUST be called prior to succesful call of ```open_clipboard```.
+///
+///# Return result:
+///
+///* ```Ok``` Content of clipboard which is stored in ```String```.
+///* ```Err``` Contains ```WinResult```.
 pub fn get_clipboard_string() -> Result<String, WinResult> {
-    let cf_unicodetext: UINT = 13;
     let result: Result<String, WinResult>;
     unsafe {
-        let text_handler: HANDLE = GetClipboardData(cf_unicodetext);
+        let text_handler: HANDLE = GetClipboardData(13 as UINT);
         if text_handler.is_null() {
             result = Err(WinResult(GetLastError()));
         }
@@ -139,6 +142,36 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
     result
 }
 
+///Wrapper around ```GetClipboardData```.
+///
+///This function MUST be called prior to succesful call of ```open_clipboard```.
+///
+///# Parameters:
+///
+///* ```format``` clipboard format code.
+///
+///# Return result:
+///
+///* ```Ok``` Content of clipboard which is stored in ```String```.
+///* ```Err``` Contains ```WinResult```.
+pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
+    let result: Result<String, WinResult>;
+    unsafe {
+        let text_handler: HANDLE = GetClipboardData(format as UINT);
+        if text_handler.is_null() {
+            result = Err(WinResult(GetLastError()));
+        }
+        else {
+            let text_p = GlobalLock(text_handler) as *const wchar_t;
+            let len: usize = rust_strlen(text_p);
+            let text_s = std::slice::from_raw_parts(text_p, len);
+
+            result = Ok(String::from_utf16_lossy(text_s));
+            GlobalUnlock(text_handler);
+        }
+    }
+    result
+}
 ///Extracts available clipboard formats.
 ///
 ///# Return result:
@@ -169,6 +202,10 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
 ///
 ///# Note:
 ///It is not possible to retrieve name of predefined clipboard format.
+///
+///# Parameters:
+///
+///* ```format``` clipboard format code.
 ///
 ///# Return result:
 ///
