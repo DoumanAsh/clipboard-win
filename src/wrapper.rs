@@ -1,7 +1,7 @@
 //!Provides direct wrappers to WinAPI functions.
 //!
 //!These functions omit calls to ```OpenClipboard``` and ```CloseClipboard```.
-//!Due to that it is important that these function will be called by following requirements.
+//!Due to that most functions have requirements for them to be called.
 
 extern crate user32;
 extern crate kernel32;
@@ -13,7 +13,7 @@ use winapi::wchar_t; //u16
 use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
 //functions
-use kernel32::{GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
+use kernel32::{GlobalFree, GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
 use user32::{GetClipboardFormatNameW, EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
 //std
@@ -56,7 +56,7 @@ pub fn open_clipboard() -> WinResult {
 #[inline]
 ///Wrapper around ```CloseClipboard```.
 ///
-///This function MUST be called only after ```open_clipboard``` has been called.
+///This function MUST be called prior to successful call of ```open_clipboard```.
 pub fn close_clipboard() -> WinResult {
     unsafe {
         if CloseClipboard() == 0 {
@@ -70,7 +70,7 @@ pub fn close_clipboard() -> WinResult {
 #[inline]
 ///Wrapper around ```EmptyClipboard```.
 ///
-///This function MUST be called prior to succesful call of ```open_clipboard```.
+///This function MUST be called prior to successful call of ```open_clipboard```.
 pub fn empty_clipboard() -> WinResult {
     unsafe {
         if EmptyClipboard() == 0 {
@@ -83,7 +83,7 @@ pub fn empty_clipboard() -> WinResult {
 
 ///Wrapper around ```SetClipboardData```.
 ///
-///This function MUST be called prior to succesful call of ```open_clipboard```.
+///This function MUST be called prior to successful call of ```open_clipboard```.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 66;
@@ -109,42 +109,31 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
 
             //Set new clipboard text.
             EmptyClipboard();
-            SetClipboardData(format, handler);
+            if SetClipboardData(format, handler).is_null() {
+                GlobalFree(handler);
+                return WinResult(GetLastError());
+            }
         }
     }
     WinResult(0)
 }
 
+#[inline(always)]
 ///Wrapper around ```GetClipboardData``` with hardcoded UTF16 format.
 ///
-///This function MUST be called prior to succesful call of ```open_clipboard```.
+///This function MUST be called prior to successful call of ```open_clipboard```.
 ///
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Contains ```WinResult```.
 pub fn get_clipboard_string() -> Result<String, WinResult> {
-    let result: Result<String, WinResult>;
-    unsafe {
-        let text_handler: HANDLE = GetClipboardData(13 as UINT);
-        if text_handler.is_null() {
-            result = Err(WinResult(GetLastError()));
-        }
-        else {
-            let text_p = GlobalLock(text_handler) as *const wchar_t;
-            let len: usize = rust_strlen(text_p);
-            let text_s = std::slice::from_raw_parts(text_p, len);
-
-            result = Ok(String::from_utf16_lossy(text_s));
-            GlobalUnlock(text_handler);
-        }
-    }
-    result
+    get_clipboard(13)
 }
 
 ///Wrapper around ```GetClipboardData```.
 ///
-///This function MUST be called prior to succesful call of ```open_clipboard```.
+///This function MUST be called prior to successful call of ```open_clipboard```.
 ///
 ///# Parameters:
 ///
