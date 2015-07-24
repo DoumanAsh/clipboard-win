@@ -3,6 +3,8 @@ extern crate clipboard_win;
 use clipboard_win::*;
 use clipboard_win::wrapper::get_clipboard_seq_num;
 
+//NOTE: parallel running may cause fail.
+
 #[test]
 fn win_error_test() {
     let result = WinResult::new(0);
