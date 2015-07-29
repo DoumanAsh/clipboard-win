@@ -7,15 +7,13 @@ use clipboard_win::wrapper::get_clipboard_seq_num;
 
 #[test]
 fn win_error_test() {
-    let result = WinResult::new(0);
-    assert!(result.is_ok());
+    let result = WindowsError::new(0);
     println!("WinError({})={}", &result.errno(), result.errno_desc());
 
-    assert!(result == WinResult::new(0));
-    assert!(WinResult::new(1) != result);
+    assert!(result == WindowsError::new(0));
+    assert!(WindowsError::new(1) != result);
 
-    let result = WinResult::new(666);
-    assert!(result.is_err());
+    let result = WindowsError::new(666);
     println!("WinError({})={}", &result.errno(), result.errno_desc());
 }
 

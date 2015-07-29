@@ -21,7 +21,7 @@ use std;
 use std::os::windows::ffi::OsStrExt;
 
 //clipboard_win
-use super::{WinResult, rust_strlen};
+use super::{WindowsError, rust_strlen};
 
 #[inline]
 ///Wrapper around ```GetClipboardSequenceNumber```.
@@ -40,50 +40,50 @@ pub fn get_clipboard_seq_num() -> Option<u32> {
 #[inline]
 ///Wrapper around ```OpenClipboard```.
 ///
-///This function MUST be called only once until clipboard will not be closed again with
+///This function MUST be called only once until the clipboard is closed again with
 ///```close_clipboard```.
-pub fn open_clipboard() -> WinResult {
+pub fn open_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
-            return WinResult(GetLastError());
+            return Err(WindowsError(GetLastError()));
         }
     }
 
-    WinResult(0)
+    Ok(())
 }
 
 #[inline]
 ///Wrapper around ```CloseClipboard```.
 ///
-///This function MUST be called prior to successful call of ```open_clipboard```.
-pub fn close_clipboard() -> WinResult {
+///This function MUST be called after a successful call of ```open_clipboard```.
+pub fn close_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if CloseClipboard() == 0 {
-            return WinResult(GetLastError());
+            return Err(WindowsError(GetLastError()));
         }
     }
 
-    WinResult(0)
+    Ok(())
 }
 
 #[inline]
 ///Wrapper around ```EmptyClipboard```.
 ///
-///This function MUST be called prior to successful call of ```open_clipboard```.
-pub fn empty_clipboard() -> WinResult {
+///This function MUST be called after a successful call of ```open_clipboard```.
+pub fn empty_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if EmptyClipboard() == 0 {
-            return WinResult(GetLastError());
+            return Err(WindowsError(GetLastError()));
         }
     }
 
-    WinResult(0)
+    Ok(())
 }
 
 ///Wrapper around ```SetClipboardData```.
 ///
-///This function MUST be called prior to successful call of ```open_clipboard```.
-pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult {
+///This function MUST be called after a successful call of ```open_clipboard```.
+pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
     let format: UINT = 13; //unicode
     let ghnd: UINT = 66;
     let text = text.as_ref();
@@ -93,7 +93,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
         let len: usize = (utf16_buff.len()+1) * 2;
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         if handler.is_null() {
-            return WinResult(GetLastError());
+            return Err(WindowsError(GetLastError()));
         }
         else {
             let lock = GlobalLock(handler) as *mut u16;
@@ -109,31 +109,31 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
             //Set new clipboard text.
             EmptyClipboard();
             if SetClipboardData(format, handler).is_null() {
-                let result = WinResult(GetLastError());
+                let result = Err(WindowsError(GetLastError()));
                 GlobalFree(handler);
                 return result;
             }
         }
     }
-    WinResult(0)
+    Ok(())
 }
 
 #[inline(always)]
 ///Wrapper around ```GetClipboardData``` with hardcoded UTF16 format.
 ///
-///This function MUST be called prior to successful call of ```open_clipboard```.
+///This function MUST be called after a successful call of ```open_clipboard```.
 ///
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Contains ```WinResult```.
-pub fn get_clipboard_string() -> Result<String, WinResult> {
+///* ```Err``` Contains ```WindowsError```.
+pub fn get_clipboard_string() -> Result<String, WindowsError> {
     get_clipboard(13)
 }
 
 ///Wrapper around ```GetClipboardData```.
 ///
-///This function MUST be called prior to successful call of ```open_clipboard```.
+///This function MUST be called after a successful call of ```open_clipboard```.
 ///
 ///# Parameters:
 ///
@@ -142,13 +142,13 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Contains ```WinResult```.
-pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
-    let result: Result<String, WinResult>;
+///* ```Err``` Contains ```WindowsError```.
+pub fn get_clipboard(format: u32) -> Result<String, WindowsError> {
+    let result: Result<String, WindowsError>;
     unsafe {
         let text_handler: HANDLE = GetClipboardData(format as UINT);
         if text_handler.is_null() {
-            result = Err(WinResult(GetLastError()));
+            result = Err(WindowsError(GetLastError()));
         }
         else {
             let text_p = GlobalLock(text_handler) as *const wchar_t;
@@ -166,8 +166,8 @@ pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
 ///# Return result:
 ///
 ///* ```Ok``` Vector of available formats.
-///* ```Err``` Contains ```WinResult```.
-pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
+///* ```Err``` Contains ```WindowsError```.
+pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
     let mut result: Vec<u32> = vec![];
     unsafe {
         let mut clip_format: u32 = EnumClipboardFormats(0);
@@ -180,7 +180,7 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
         let error = GetLastError();
 
         if error != 0 {
-            return Err(WinResult(error));
+            return Err(WindowsError(error));
         }
     }
 
