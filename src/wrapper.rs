@@ -18,7 +18,6 @@ use user32::{GetClipboardFormatNameW, EnumClipboardFormats, GetClipboardSequence
 
 //std
 use std;
-
 use std::os::windows::ffi::OsStrExt;
 
 //clipboard_win
@@ -110,8 +109,9 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult 
             //Set new clipboard text.
             EmptyClipboard();
             if SetClipboardData(format, handler).is_null() {
+                let result = WinResult(GetLastError());
                 GlobalFree(handler);
-                return WinResult(GetLastError());
+                return result;
             }
         }
     }
