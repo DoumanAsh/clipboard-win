@@ -147,7 +147,7 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
     let ghnd: UINT = 66;
     unsafe {
         //allocate buffer and copy string to it.
-        let len: usize = data.len();
+        let len: usize = data.len() + 1;
         let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
         if handler.is_null() {
             return Err(WindowsError(GetLastError()));
