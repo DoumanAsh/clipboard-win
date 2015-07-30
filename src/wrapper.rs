@@ -155,8 +155,9 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
         else {
             let lock = GlobalLock(handler) as *mut u8;
 
+            let len: usize = len - 1;
                                           //src,         dest, len
-            std::ptr::copy_nonoverlapping(data.as_ptr(), lock, len - 1);
+            std::ptr::copy_nonoverlapping(data.as_ptr(), lock, len);
             let len: isize = len as isize;
             *lock.offset(len) = 0;
 

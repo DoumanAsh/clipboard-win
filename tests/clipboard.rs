@@ -101,5 +101,6 @@ fn register_format_test() {
     assert!(result.is_ok());
     let result = result.unwrap();
 
+    assert!(result == expect_buf);
     println!("register_format_test: saved clipboard={:?}", result);
 }
