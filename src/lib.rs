@@ -65,14 +65,13 @@ impl WindowsError {
 
 impl fmt::Display for WindowsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        try!(write!(f, "WindowsError({})", self.errno()));
-        Ok(())
+        write!(f, "WindowsError({})", self.errno())
     }
 }
 
 impl Error for WindowsError {
     fn description(&self) -> &str {
-        "WindowsError"
+        "WinAPI Error"
     }
 }
 
