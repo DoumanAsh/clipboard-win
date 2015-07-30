@@ -29,7 +29,7 @@ use wrapper::{get_clipboard_seq_num};
 use std::error::Error;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 ///Represents Windows error code.
 pub struct WindowsError(u32);
 
@@ -60,6 +60,13 @@ impl WindowsError {
         }
 
         String::from_utf16(&format_buff).unwrap_or("Unknown error".to_string())
+    }
+}
+
+//Own debug as derive one is a bit lame
+impl fmt::Debug for WindowsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "WindowsError({})", self.errno())
     }
 }
 
@@ -162,30 +169,21 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
     result
 }
 
-///Rust variant of strlen.
-///
-///# Parameters:
-///
-///* ```buff_p``` Must be valid non-NULL pointer.
 #[inline(always)]
-pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
-    let mut idx: isize = 0;
-    while *buff_p.offset(idx) != 0 { idx += 1; }
-    idx as usize
-}
-
-#[inline(always)]
-///Extracts clipboard content in UTF16 and convert it to String.
+///Retrieves clipboard content in UTF16 format and convert it to String.
 ///
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Contains ```WindowsError```.
 pub fn get_clipboard_string() -> Result<String, WindowsError> {
-    get_clipboard(13)
+    try!(wrapper::open_clipboard());
+    let result = wrapper::get_clipboard_string();
+    try!(wrapper::close_clipboard());
+    result
 }
 
-///Extracts clipboard content and convert it to String.
+///Retrieves clipboard content.
 ///
 ///# Parameters:
 ///
@@ -193,9 +191,9 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
 ///
 ///# Return result:
 ///
-///* ```Ok``` Content of clipboard which is stored in ```String```.
+///* ```Ok``` Contains buffer with raw data.
 ///* ```Err``` Contains ```WindowsError```.
-pub fn get_clipboard(format: u32) -> Result<String, WindowsError> {
+pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
     try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard(format);
     try!(wrapper::close_clipboard());
@@ -225,8 +223,8 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
 ///* ```Some``` String which contains the format's name.
 ///* ```None``` If format name is incorrect or predefined.
 pub fn get_format_name(format: u32) -> Option<String> {
-    if let Err(_) = wrapper::open_clipboard() { return None; }
+    if wrapper::open_clipboard().is_err() { return None; }
     let result = wrapper::get_format_name(format);
-    if let Err(_) = wrapper::close_clipboard() { return None; }
+    if wrapper::close_clipboard().is_err() { return None; }
     result
 }
