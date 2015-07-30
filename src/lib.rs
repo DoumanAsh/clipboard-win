@@ -26,32 +26,23 @@ use kernel32::{FormatMessageW};
 pub mod wrapper;
 use wrapper::{get_clipboard_seq_num};
 
-#[derive(Debug, Clone)]
-///Represents Windows result.
-pub struct WinResult(u32);
+use std::error::Error;
+use std::fmt;
 
-impl WinResult {
+#[derive(Debug, Clone)]
+///Represents Windows error code.
+pub struct WindowsError(u32);
+
+impl WindowsError {
     ///Custom errors
 
     ///Constructs new error.
-    pub fn new(errno: u32) -> WinResult {
-        WinResult(errno)
+    pub fn new(errno: u32) -> WindowsError {
+        WindowsError(errno)
     }
 
     #[inline(always)]
-    ///Returns ```true``` if result is ok
-    pub fn is_ok(&self) -> bool {
-        self.0 == 0
-    }
-
-    #[inline(always)]
-    ///Returns ```true``` if result is not ok
-    pub fn is_err(&self) -> bool {
-        !self.is_ok()
-    }
-
-    #[inline(always)]
-    ///Returns extended error code. Should be used in case if result is not ok.
+    ///Returns underlying error code.
     pub fn errno(&self) -> u32 {
         self.0
     }
@@ -72,12 +63,24 @@ impl WinResult {
     }
 }
 
-impl PartialEq for WinResult {
-    fn eq(&self, right: &WinResult) -> bool {
+impl fmt::Display for WindowsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "WindowsError({})", self.errno())
+    }
+}
+
+impl Error for WindowsError {
+    fn description(&self) -> &str {
+        "WinAPI Error"
+    }
+}
+
+impl PartialEq for WindowsError {
+    fn eq(&self, right: &WindowsError) -> bool {
         self.0 == right.0
     }
 
-    fn ne(&self, right: &WinResult) -> bool {
+    fn ne(&self, right: &WindowsError) -> bool {
         self.0 != right.0
     }
 }
@@ -90,12 +93,12 @@ impl PartialEq for WinResult {
 pub struct ClipboardManager {
     delay_ms: u32,
     ok_fn: fn(&String) -> (),
-    err_fn: fn(&WinResult) -> (),
+    err_fn: fn(&WindowsError) -> (),
 }
 
 impl ClipboardManager {
     fn default_ok(text: &String) -> () { println!("Clipboard content: {}", &text); }
-    fn default_err(err_code: &WinResult) -> () { println!("Failed to get clipboard. Reason:{}", err_code.errno_desc()); }
+    fn default_err(err_code: &WindowsError) -> () { println!("Failed to get clipboard. Reason:{}", err_code.errno_desc()); }
     ///Constructs new ClipboardManager with default settings
     pub fn new() -> ClipboardManager {
         ClipboardManager {
@@ -121,7 +124,7 @@ impl ClipboardManager {
     ///Sets callback for failed retrieval of clipboard's text.
     ///
     ///Error code is passed from ```get_clipboard_string()```
-    pub fn err_callback(&mut self, callback: fn(&WinResult) -> ()) -> &mut ClipboardManager
+    pub fn err_callback(&mut self, callback: fn(&WindowsError) -> ()) -> &mut ClipboardManager
      {
         self.err_fn = callback;
         self
@@ -152,12 +155,10 @@ impl ClipboardManager {
 }
 
 ///Set clipboard with text.
-pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> WinResult {
-    let result = wrapper::open_clipboard();
-    if result.is_err() { return result; }
-
+pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
+    try!(wrapper::open_clipboard());
     let result = wrapper::set_clipboard(text);
-    wrapper::close_clipboard();
+    try!(wrapper::close_clipboard());
     result
 }
 
@@ -179,8 +180,8 @@ pub unsafe fn rust_strlen(buff_p: *const u16) -> usize {
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Contains ```WinResult```.
-pub fn get_clipboard_string() -> Result<String, WinResult> {
+///* ```Err``` Contains ```WindowsError```.
+pub fn get_clipboard_string() -> Result<String, WindowsError> {
     get_clipboard(13)
 }
 
@@ -193,13 +194,11 @@ pub fn get_clipboard_string() -> Result<String, WinResult> {
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Contains ```WinResult```.
-pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
-    let result = wrapper::open_clipboard();
-    if result.is_err() { return Err(result); }
-
+///* ```Err``` Contains ```WindowsError```.
+pub fn get_clipboard(format: u32) -> Result<String, WindowsError> {
+    try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard(format);
-    wrapper::close_clipboard();
+    try!(wrapper::close_clipboard());
     result
 }
 
@@ -209,12 +208,10 @@ pub fn get_clipboard(format: u32) -> Result<String, WinResult> {
 ///
 ///* ```Ok``` Vector of available formats.
 ///* ```Err``` Error description.
-pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
-    let result = wrapper::open_clipboard();
-    if result.is_err() { return Err(result); }
-
+pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
+    try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard_formats();
-    wrapper::close_clipboard();
+    try!(wrapper::close_clipboard());
     result
 }
 
@@ -228,10 +225,8 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WinResult> {
 ///* ```Some``` String which contains the format's name.
 ///* ```None``` If format name is incorrect or predefined.
 pub fn get_format_name(format: u32) -> Option<String> {
-    let result = wrapper::open_clipboard();
-    if result.is_err() { return None; }
-
+    if let Err(_) = wrapper::open_clipboard() { return None; }
     let result = wrapper::get_format_name(format);
-    wrapper::close_clipboard();
+    if let Err(_) = wrapper::close_clipboard() { return None; }
     result
 }
