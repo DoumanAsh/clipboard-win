@@ -20,11 +20,15 @@ extern crate kernel32;
 
 //WinAPI
 //functions
+use winapi::{DWORD};
 use kernel32::{FormatMessageW};
 
 //wrapper functions
 pub mod wrapper;
 use wrapper::{get_clipboard_seq_num};
+
+mod constants;
+use constants::*;
 
 use std::error::Error;
 use std::fmt;
@@ -49,11 +53,15 @@ impl WindowsError {
 
     ///Returns description of WinAPI error code.
     pub fn errno_desc(&self) -> String {
-        let mut format_buff: [u16; 300] = [0; 300];
-        let num_chars: u32 = unsafe { FormatMessageW(0x00000200 | 0x00001000 | 0x00002000,
+        const BUF_SIZE: usize = 512;
+        let mut format_buff: [u16; BUF_SIZE] = [0; BUF_SIZE];
+        let fmt_flags: DWORD = FORMAT_MESSAGE_IGNORE_INSERTS
+                             | FORMAT_MESSAGE_FROM_SYSTEM
+                             | FORMAT_MESSAGE_ARGUMENT_ARRAY;
+        let num_chars: u32 = unsafe { FormatMessageW(fmt_flags,
                                                      std::ptr::null(), self.0,
                                                      0, format_buff.as_mut_ptr(),
-                                                     200 as u32, std::ptr::null_mut()) };
+                                                     BUF_SIZE as u32, std::ptr::null_mut()) };
 
         if num_chars == 0 {
             return "Unknown error".to_string();
