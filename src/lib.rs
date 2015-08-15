@@ -55,19 +55,20 @@ impl WindowsError {
     pub fn errno_desc(&self) -> String {
         const BUF_SIZE: usize = 512;
         let mut format_buff: [u16; BUF_SIZE] = [0; BUF_SIZE];
-        let fmt_flags: DWORD = FORMAT_MESSAGE_IGNORE_INSERTS
-                             | FORMAT_MESSAGE_FROM_SYSTEM
-                             | FORMAT_MESSAGE_ARGUMENT_ARRAY;
+        let fmt_flags: DWORD = FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY;
         let num_chars: u32 = unsafe { FormatMessageW(fmt_flags,
                                                      std::ptr::null(), self.0,
                                                      0, format_buff.as_mut_ptr(),
                                                      BUF_SIZE as u32, std::ptr::null_mut()) };
 
-        if num_chars == 0 {
+        let num_chars: usize = num_chars as usize;
+        //Errors are formatted with windows new lines at the end.
+        //If string does not end with /r/n then, most possibly, it is not a error
+        //but some other system thing(who knows what...)
+        if num_chars == 0 || format_buff[num_chars-1] != 10 {
             return "Unknown error".to_string();
         }
-
-        String::from_utf16(&format_buff).unwrap_or("Unknown error".to_string())
+        String::from_utf16_lossy(&format_buff[0..num_chars-2])
     }
 }
 
