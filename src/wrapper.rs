@@ -101,14 +101,14 @@ pub fn empty_clipboard() -> Result<(), WindowsError> {
 ///
 ///This function MUST be called after a successful call of ```open_clipboard```.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
-    let format: UINT = 13; //unicode
-    let ghnd: UINT = 66;
+    const FORMAT: UINT = 13; //unicode
+    const FLAG_GHND: UINT = 66;
     let text = text.as_ref();
     unsafe {
         //allocate buffer and copy string to it.
         let utf16_buff: Vec<u16> = text.encode_wide().collect();
         let len: usize = (utf16_buff.len()+1) * 2;
-        let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
+        let handler: HGLOBAL = GlobalAlloc(FLAG_GHND, len as SIZE_T);
         if handler.is_null() {
             return Err(WindowsError(GetLastError()));
         }
@@ -125,7 +125,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 
             //Set new clipboard text.
             EmptyClipboard();
-            if SetClipboardData(format, handler).is_null() {
+            if SetClipboardData(FORMAT, handler).is_null() {
                 let result = Err(WindowsError(GetLastError()));
                 GlobalFree(handler);
                 return result;
@@ -144,11 +144,11 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 ///
 ///This function MUST be called after a successful call of ```open_clipboard```.
 pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
-    let ghnd: UINT = 66;
+    const FLAG_GHND: UINT = 66;
     unsafe {
         //allocate buffer and copy string to it.
         let len: usize = data.len() + 1;
-        let handler: HGLOBAL = GlobalAlloc(ghnd, len as SIZE_T);
+        let handler: HGLOBAL = GlobalAlloc(FLAG_GHND, len as SIZE_T);
         if handler.is_null() {
             return Err(WindowsError(GetLastError()));
         }
