@@ -38,8 +38,6 @@ use std::fmt;
 pub struct WindowsError(u32);
 
 impl WindowsError {
-    ///Custom errors
-
     ///Constructs new error.
     pub fn new(errno: u32) -> WindowsError {
         WindowsError(errno)
@@ -51,7 +49,7 @@ impl WindowsError {
         self.0
     }
 
-    ///Returns description of WinAPI error code.
+    ///Returns description of underlying error code.
     pub fn errno_desc(&self) -> String {
         const BUF_SIZE: usize = 512;
         let mut format_buff: [u16; BUF_SIZE] = [0; BUF_SIZE];
@@ -66,7 +64,7 @@ impl WindowsError {
         //If string does not end with /r/n then, most possibly, it is not a error
         //but some other system thing(who knows what...)
         if num_chars == 0 || format_buff[num_chars-1] != 10 {
-            return "Unknown error".to_string();
+            return "Unknown Error.".to_string();
         }
         String::from_utf16_lossy(&format_buff[0..num_chars-2])
     }
@@ -75,13 +73,13 @@ impl WindowsError {
 //Own debug as derive one is a bit lame
 impl fmt::Debug for WindowsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "WindowsError({})", self.errno())
+        write!(f, "WinAPI Error({})", self.errno())
     }
 }
 
 impl fmt::Display for WindowsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "WindowsError({})", self.errno())
+        write!(f, "WinAPI Error({})", self.errno())
     }
 }
 

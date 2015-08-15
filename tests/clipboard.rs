@@ -7,14 +7,21 @@ use clipboard_win::wrapper::{open_clipboard, close_clipboard, set_clipboard_raw,
 
 #[test]
 fn win_error_test() {
-    let result = WindowsError::new(0);
-    println!("WinError({})={}", &result.errno(), result.errno_desc());
+    //check PartialEq
+    assert!(WindowsError::new(0) == WindowsError::new(0));
+    assert!(WindowsError::new(1) != WindowsError::new(0));
 
-    assert!(result == WindowsError::new(0));
-    assert!(WindowsError::new(1) != result);
+    let result = WindowsError::new(0);
+    assert!("The operation completed successfully.".to_string() == result.errno_desc());
+    println!("{}={}", &result, result.errno_desc());
+
+    let result = WindowsError::new(1);
+    assert!("Incorrect function.".to_string() == result.errno_desc());
+    println!("{}={}", &result, result.errno_desc());
 
     let result = WindowsError::new(666);
-    println!("WinError({})={}", &result.errno(), result.errno_desc());
+    assert!("Unknown Error.".to_string() == result.errno_desc());
+    println!("{}={}", &result, result.errno_desc());
 }
 
 #[test]
