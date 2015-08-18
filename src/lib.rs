@@ -23,12 +23,13 @@ extern crate kernel32;
 use winapi::{DWORD};
 use kernel32::{FormatMessageW};
 
+mod constants;
+use constants::{FORMAT_MESSAGE_IGNORE_INSERTS, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_ARGUMENT_ARRAY};
+pub mod clipboard_formats;
+
 //wrapper functions
 pub mod wrapper;
 use wrapper::{get_clipboard_seq_num};
-
-mod constants;
-use constants::*;
 
 use std::error::Error;
 use std::fmt;
@@ -168,6 +169,7 @@ impl ClipboardManager {
     }
 }
 
+#[inline]
 ///Set clipboard with text.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
     try!(wrapper::open_clipboard());
@@ -176,7 +178,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
     result
 }
 
-#[inline(always)]
+#[inline]
 ///Retrieves clipboard content in UTF16 format and convert it to String.
 ///
 ///# Return result:
@@ -190,6 +192,7 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
     result
 }
 
+#[inline]
 ///Retrieves clipboard content.
 ///
 ///# Parameters:
@@ -207,6 +210,7 @@ pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
     result
 }
 
+#[inline]
 ///Extracts available clipboard formats.
 ///
 ///# Return result:
@@ -220,6 +224,7 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
     result
 }
 
+#[inline]
 ///Returns format name based on it's code.
 ///
 ///# Note:

@@ -21,6 +21,7 @@ use std::os::windows::ffi::OsStrExt;
 
 //clipboard_win
 use super::WindowsError;
+use super::clipboard_formats::*;
 
 macro_rules! return_err {
     () => { return Err(WindowsError(unsafe { GetLastError() })); }
@@ -101,7 +102,6 @@ pub fn empty_clipboard() -> Result<(), WindowsError> {
 ///
 ///This function MUST be called after a successful call of ```open_clipboard```.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
-    const FORMAT: UINT = 13; //unicode
     const FLAG_GHND: UINT = 66;
     let text = text.as_ref();
     unsafe {
@@ -125,7 +125,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 
             //Set new clipboard text.
             EmptyClipboard();
-            if SetClipboardData(FORMAT, handler).is_null() {
+            if SetClipboardData(CF_UNICODETEXT, handler).is_null() {
                 let result = Err(WindowsError(GetLastError()));
                 GlobalFree(handler);
                 return result;
@@ -175,7 +175,6 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
     Ok(())
 }
 
-#[inline(always)]
 ///Wrapper around ```GetClipboardData``` with hardcoded UTF16 format.
 ///
 ///This function MUST be called after a successful call of ```open_clipboard```.
@@ -290,8 +289,8 @@ pub fn get_format_name(format: u32) -> Option<String> {
     Some(String::from_utf16_lossy(&format_buff))
 }
 
-#[inline]
-///Determines whatever provided clipboard format is available or not.
+#[inline(always)]
+///Determines whatever provided clipboard format is available on clipboard or not.
 ///
 ///# Return result:
 ///
@@ -301,6 +300,7 @@ pub fn is_format_avail(format: u32) -> bool {
     unsafe { IsClipboardFormatAvailable(format) != 0 }
 }
 
+#[inline]
 ///Retrieves number of currently available formats on clipboard.
 ///
 ///# Return result:

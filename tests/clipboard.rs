@@ -63,6 +63,7 @@ fn set_clipboard_test() {
 #[test]
 fn get_clipboard_test() {
     let result = get_clipboard_string();
+    println!("{:?}", result);
     assert!(result.is_ok());
 
     println!("get_clipboard_test: Clipboard: {}", result.unwrap());
