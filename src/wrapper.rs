@@ -226,7 +226,6 @@ pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
             let text_p = GlobalLock(text_handler) as *const u8;
             let len: usize = rust_strlen8(text_p);
             let text_vec: Vec<u8> = std::slice::from_raw_parts(text_p, len).to_vec();
-            println!("get_clipboard: text_vec={:?}", &text_vec);
 
             result = Ok(text_vec);
             GlobalUnlock(text_handler);
