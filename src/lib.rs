@@ -162,7 +162,6 @@ impl ClipboardManager {
                     Ok(clip_text) => { (self.ok_fn)(&clip_text) },
                     Err(err_code) => { (self.err_fn)(&err_code) },
                 }
-            println!(">>>");
             }
             std::thread::sleep_ms(self.delay_ms);
         }

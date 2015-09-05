@@ -55,7 +55,7 @@ fn set_clipboard_test() {
         let result = result.unwrap();
 
         println!("set_clipboard_test: Clipboard: {}", result);
-        println!("set_clipboard_test: Expected: {}", expected_string);
+        println!("set_clipboard_test: Expected:  {}", expected_string);
         assert!(result == expected_string);
     }
 }
