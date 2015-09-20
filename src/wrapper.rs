@@ -186,7 +186,7 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
 pub fn get_clipboard_string() -> Result<String, WindowsError> {
     let result: Result<String, WindowsError>;
     unsafe {
-        let text_handler: HANDLE = GetClipboardData(13 as u32);
+        let text_handler: HANDLE = GetClipboardData(CF_UNICODETEXT as u32);
         if text_handler.is_null() {
             result = Err(WindowsError(GetLastError()));
         }
@@ -289,7 +289,7 @@ pub fn get_format_name(format: u32) -> Option<String> {
 }
 
 #[inline(always)]
-///Determines whatever provided clipboard format is available on clipboard or not.
+///Determines whenever provided clipboard format is available on clipboard or not.
 ///
 ///# Return result:
 ///

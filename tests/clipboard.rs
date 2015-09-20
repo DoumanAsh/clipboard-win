@@ -81,13 +81,9 @@ fn count_formats_test() {
 
     assert!(result.is_ok());
 
-    //Now it is a bit bad test, but generally there should be:
-    // 4 - text
-    // 11 - link
-    // 13 - file/directory
     let result = result.unwrap();
     println!("count_formats_test: number of formats={}", result);
-    assert!(result == 4 || result == 11 || result == 13);
+    assert!(result > 0);
 }
 
 #[test]

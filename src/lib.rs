@@ -185,6 +185,10 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Contains ```WindowsError```.
 pub fn get_clipboard_string() -> Result<String, WindowsError> {
+    //If there is no such format on clipboard then we can return right now
+    //From point of view Windows this is not an error case, but we still unable to get anything.
+    if !wrapper::is_format_avail(clipboard_formats::CF_UNICODETEXT) { return Err(WindowsError(0)) }
+
     try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard_string();
     try!(wrapper::close_clipboard());
@@ -203,6 +207,9 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
 ///* ```Ok``` Contains buffer with raw data.
 ///* ```Err``` Contains ```WindowsError```.
 pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
+    //see comment get_clipboard_string()
+    if !wrapper::is_format_avail(format) { return Err(WindowsError(0)) }
+
     try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard(format);
     try!(wrapper::close_clipboard());
