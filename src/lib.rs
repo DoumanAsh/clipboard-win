@@ -53,9 +53,9 @@ impl WindowsError {
     ///Returns description of underlying error code.
     pub fn errno_desc(&self) -> String {
         const BUF_SIZE: usize = 512;
+        const FMT_FLAGS: DWORD = FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY;
         let mut format_buff: [u16; BUF_SIZE] = [0; BUF_SIZE];
-        let fmt_flags: DWORD = FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY;
-        let num_chars: u32 = unsafe { FormatMessageW(fmt_flags,
+        let num_chars: u32 = unsafe { FormatMessageW(FMT_FLAGS,
                                                      std::ptr::null(), self.0,
                                                      0, format_buff.as_mut_ptr(),
                                                      BUF_SIZE as u32, std::ptr::null_mut()) };
@@ -99,6 +99,37 @@ impl PartialEq for WindowsError {
         self.0 != right.0
     }
 }
+
+macro_rules! impl_traits
+{
+    ($($t:ty), +) => {
+        $(
+            impl From<$t> for WindowsError {
+                fn from(num: $t) -> Self {
+                    WindowsError(num as u32)
+                }
+            }
+
+            impl Into<$t> for WindowsError {
+                fn into(self) -> $t {
+                    self.0 as $t
+                }
+            }
+
+            impl PartialEq<$t> for WindowsError {
+                fn eq(&self, right: &$t) -> bool {
+                    self.0 == *right as u32
+                }
+
+                fn ne(&self, right: &$t) -> bool {
+                    self.0 != *right as u32
+                }
+            }
+        )+
+    };
+}
+
+impl_traits!(u32, u16, u8, usize, i32, i16, i8, isize);
 
 ///Clipboard manager provides a primitive hack for console application to handle updates of
 ///clipboard. It uses ```get_clipboard_seq_num``` to determines whatever clipboard is updated or
