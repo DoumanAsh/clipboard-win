@@ -21,6 +21,7 @@ Set-Location $PSScriptRoot #just in case set the location to script(Clipboard-wi
 switch ($args[0])
 {
     "test" {
+        echo "let's save some clipboard!" | Clip
         $env:RUST_TEST_THREADS=1
         cargo test
     }
@@ -31,7 +32,7 @@ switch ($args[0])
         #remove old documentation just in case
         Remove-Item -Recurse -ErrorAction SilentlyContinue -Force target\doc\
         cargo doc --no-deps
-        if ($args[1] -eq "--update_pages") {
+        if ($args[1] -eq "--update-pages") {
             git checkout gh-pages
             Remove-Item -Recurse -ErrorAction SilentlyContinue -Force doc\
             Copy-item -Recurse target\doc\ doc\
