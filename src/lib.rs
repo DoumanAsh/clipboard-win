@@ -18,8 +18,6 @@ extern crate winapi;
 extern crate user32;
 extern crate kernel32;
 
-//WinAPI
-//functions
 use winapi::{DWORD};
 use kernel32::{FormatMessageW};
 
@@ -27,12 +25,29 @@ mod constants;
 use constants::{FORMAT_MESSAGE_IGNORE_INSERTS, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_ARGUMENT_ARRAY};
 pub mod clipboard_formats;
 
-//wrapper functions
 pub mod wrapper;
-use wrapper::{get_clipboard_seq_num};
 
 use std::error::Error;
 use std::fmt;
+
+///try clone that returns None instead of Err<T>
+macro_rules! try_none {
+    ($expr:expr) => (match $expr {
+        Ok(val) => val,
+        Err(_) => return None,
+    })
+}
+
+///Checks format availability.
+///
+///Returns WinError if it is not available.
+macro_rules! check_format {
+    ($format:expr) => {
+        if !wrapper::is_format_avail($format) {
+            return Err(WindowsError(0))
+        }
+    }
+}
 
 #[derive(Clone)]
 ///Represents Windows error code.
@@ -131,74 +146,6 @@ macro_rules! impl_traits
 
 impl_traits!(u32, u16, u8, usize, i32, i16, i8, isize);
 
-///Clipboard manager provides a primitive hack for console application to handle updates of
-///clipboard. It uses ```get_clipboard_seq_num``` to determines whatever clipboard is updated or
-///not. Due to that this manager is a bit hacky and not exactly right way to properly work with
-///clipboard. On other hand it is the best and most easy option for console application as a proper
-///window is required to be created to work with clipboard.
-pub struct ClipboardManager {
-    delay_ms: u32,
-    ok_fn: fn(&String) -> (),
-    err_fn: fn(&WindowsError) -> (),
-}
-
-impl ClipboardManager {
-    fn default_ok(text: &String) -> () { println!("Clipboard content: {}", &text); }
-    fn default_err(err_code: &WindowsError) -> () { println!("Failed to get clipboard. Reason:{}", err_code.errno_desc()); }
-    ///Constructs new ClipboardManager with default settings
-    pub fn new() -> ClipboardManager {
-        ClipboardManager {
-            delay_ms: 100,
-            ok_fn: ClipboardManager::default_ok,
-            err_fn: ClipboardManager::default_err,
-        }
-    }
-
-    ///Configure manager's delay between accessing clipboard.
-    pub fn delay(&mut self, delay_ms: u32) -> &mut ClipboardManager {
-        self.delay_ms = delay_ms;
-        self
-    }
-
-    ///Sets callback for successfully retrieved clipboard's text.
-    pub fn ok_callback(&mut self, callback: fn(&String) -> ()) -> &mut ClipboardManager
-     {
-        self.ok_fn = callback;
-        self
-    }
-
-    ///Sets callback for failed retrieval of clipboard's text.
-    ///
-    ///Error code is passed from ```get_clipboard_string()```
-    pub fn err_callback(&mut self, callback: fn(&WindowsError) -> ()) -> &mut ClipboardManager
-     {
-        self.err_fn = callback;
-        self
-    }
-
-    ///Starts manager loop.
-    ///
-    ///It's infinitely running with delay and checking whatever clipboard is updated.
-    ///In case if it is updated callbacks will be called. Depending on whatever clipboard's text
-    ///was retrieved or not right callback will be called.
-    pub fn run(&self) -> () {
-        let mut clip_num: u32 = get_clipboard_seq_num().unwrap_or_else(|| panic!("Lacks sufficient rights to access clipboard(WINSTA_ACCESSCLIPBOARD)"));
-        loop {
-            // It is very unlikely that we would suddenly start to lack access rights.
-            // So let's just skip this iteration. Maybe it is just Windows bug... ^_^
-            let new_num = get_clipboard_seq_num().unwrap_or(0);
-            if new_num != 0 && clip_num != new_num {
-                clip_num = new_num;
-                match get_clipboard_string() {
-                    Ok(clip_text) => { (self.ok_fn)(&clip_text) },
-                    Err(err_code) => { (self.err_fn)(&err_code) },
-                }
-            }
-            std::thread::sleep_ms(self.delay_ms);
-        }
-    }
-}
-
 #[inline]
 ///Set clipboard with text.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
@@ -218,7 +165,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 pub fn get_clipboard_string() -> Result<String, WindowsError> {
     //If there is no such format on clipboard then we can return right now
     //From point of view Windows this is not an error case, but we still unable to get anything.
-    if !wrapper::is_format_avail(clipboard_formats::CF_UNICODETEXT) { return Err(WindowsError(0)) }
+    check_format!(clipboard_formats::CF_UNICODETEXT);
 
     try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard_string();
@@ -239,7 +186,7 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
 ///* ```Err``` Contains ```WindowsError```.
 pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
     //see comment get_clipboard_string()
-    if !wrapper::is_format_avail(format) { return Err(WindowsError(0)) }
+    check_format!(format);
 
     try!(wrapper::open_clipboard());
     let result = wrapper::get_clipboard(format);
@@ -272,8 +219,8 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
 ///* ```Some``` String which contains the format's name.
 ///* ```None``` If format name is incorrect or predefined.
 pub fn get_format_name(format: u32) -> Option<String> {
-    if wrapper::open_clipboard().is_err() { return None; }
+    try_none!(wrapper::open_clipboard());
     let result = wrapper::get_format_name(format);
-    if wrapper::close_clipboard().is_err() { return None; }
+    try_none!(wrapper::close_clipboard());
     result
 }

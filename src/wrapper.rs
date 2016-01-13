@@ -6,25 +6,27 @@
 extern crate user32;
 extern crate kernel32;
 
-//WinAPI
-//types
 use winapi::minwindef::{HGLOBAL, UINT};
 use winapi::winnt::HANDLE;
 use winapi::basetsd::SIZE_T;
-//functions
+
 use kernel32::{GlobalFree, GlobalAlloc, GlobalLock, GlobalUnlock, GetLastError};
 use user32::{RegisterClipboardFormatW, CountClipboardFormats, IsClipboardFormatAvailable, GetClipboardFormatNameW, EnumClipboardFormats, GetClipboardSequenceNumber, SetClipboardData, EmptyClipboard, OpenClipboard, GetClipboardData, CloseClipboard};
 
-//std
 use std;
 use std::os::windows::ffi::OsStrExt;
 
-//clipboard_win
 use super::WindowsError;
 use super::clipboard_formats::*;
 
-macro_rules! return_err {
-    () => { return Err(WindowsError(unsafe { GetLastError() })); }
+///Wrapper around ```GetLastError```.
+///
+///# Return result:
+///
+///* ```WindowsError``` with last windows error
+#[inline]
+pub fn get_last_error() -> WindowsError {
+    WindowsError(unsafe { GetLastError() })
 }
 
 #[inline(always)]
@@ -50,7 +52,10 @@ unsafe fn rust_strlen16(buff_p: *const u16) -> usize {
 ///* ```None``` In case if you do not have access. It means that zero is returned by system.
 pub fn get_clipboard_seq_num() -> Option<u32> {
     let result: u32 = unsafe { GetClipboardSequenceNumber() };
-    if result == 0 { return None; }
+
+    if result == 0 {
+        return None;
+    }
 
     Some(result)
 }
@@ -63,7 +68,7 @@ pub fn get_clipboard_seq_num() -> Option<u32> {
 pub fn open_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
-            return Err(WindowsError(GetLastError()));
+            return Err(get_last_error());
         }
     }
 
@@ -77,7 +82,7 @@ pub fn open_clipboard() -> Result<(), WindowsError> {
 pub fn close_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if CloseClipboard() == 0 {
-            return Err(WindowsError(GetLastError()));
+            return Err(get_last_error());
         }
     }
 
@@ -91,7 +96,7 @@ pub fn close_clipboard() -> Result<(), WindowsError> {
 pub fn empty_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if EmptyClipboard() == 0 {
-            return Err(WindowsError(GetLastError()));
+            return Err(get_last_error());
         }
     }
 
@@ -110,7 +115,7 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
         let len: usize = (utf16_buff.len()+1) * 2;
         let handler: HGLOBAL = GlobalAlloc(FLAG_GHND, len as SIZE_T);
         if handler.is_null() {
-            return Err(WindowsError(GetLastError()));
+            return Err(get_last_error());
         }
         else {
             let lock = GlobalLock(handler) as *mut u16;
@@ -118,15 +123,15 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
             let len: usize = (len - 1) / 2;
                                           //src,               dest, len
             std::ptr::copy_nonoverlapping(utf16_buff.as_ptr(), lock, len);
-            let len: isize = len as isize;
-            *lock.offset(len) = 0;
+            drop(utf16_buff);
+            *lock.offset(len as isize) = 0;
 
             GlobalUnlock(handler);
 
             //Set new clipboard text.
             EmptyClipboard();
             if SetClipboardData(CF_UNICODETEXT, handler).is_null() {
-                let result = Err(WindowsError(GetLastError()));
+                let result = Err(get_last_error());
                 GlobalFree(handler);
                 return result;
             }
@@ -149,8 +154,9 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
         //allocate buffer and copy string to it.
         let len: usize = data.len() + 1;
         let handler: HGLOBAL = GlobalAlloc(FLAG_GHND, len as SIZE_T);
+
         if handler.is_null() {
-            return Err(WindowsError(GetLastError()));
+            return Err(get_last_error());
         }
         else {
             let lock = GlobalLock(handler) as *mut u8;
@@ -158,15 +164,14 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
             let len: usize = len - 1;
                                           //src,         dest, len
             std::ptr::copy_nonoverlapping(data.as_ptr(), lock, len);
-            let len: isize = len as isize;
-            *lock.offset(len) = 0;
+            *lock.offset(len as isize) = 0;
 
             GlobalUnlock(handler);
 
             //Set new clipboard text.
             EmptyClipboard();
             if SetClipboardData(format, handler).is_null() {
-                let result = Err(WindowsError(GetLastError()));
+                let result = Err(get_last_error());
                 GlobalFree(handler);
                 return result;
             }
@@ -187,13 +192,13 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
     let result: Result<String, WindowsError>;
     unsafe {
         let text_handler: HANDLE = GetClipboardData(CF_UNICODETEXT as u32);
+
         if text_handler.is_null() {
-            result = Err(WindowsError(GetLastError()));
+            result = Err(get_last_error());
         }
         else {
             let text_p = GlobalLock(text_handler) as *const u16;
-            let len: usize = rust_strlen16(text_p);
-            let text_s = std::slice::from_raw_parts(text_p, len);
+            let text_s = std::slice::from_raw_parts(text_p, rust_strlen16(text_p));
 
             result = Ok(String::from_utf16_lossy(text_s));
             GlobalUnlock(text_handler);
@@ -219,13 +224,13 @@ pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
     let result: Result<Vec<u8>, WindowsError>;
     unsafe {
         let text_handler: HANDLE = GetClipboardData(format as UINT);
+
         if text_handler.is_null() {
-            result = Err(WindowsError(GetLastError()));
+            result = Err(get_last_error());
         }
         else {
             let text_p = GlobalLock(text_handler) as *const u8;
-            let len: usize = rust_strlen8(text_p);
-            let text_vec: Vec<u8> = std::slice::from_raw_parts(text_p, len).to_vec();
+            let text_vec: Vec<u8> = std::slice::from_raw_parts(text_p, rust_strlen8(text_p)).to_vec();
 
             result = Ok(text_vec);
             GlobalUnlock(text_handler);
@@ -245,12 +250,12 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
     let mut result: Vec<u32> = vec![];
     unsafe {
         let mut clip_format: u32 = EnumClipboardFormats(0);
+
         while clip_format != 0 {
             result.push(clip_format);
             clip_format = EnumClipboardFormats(clip_format);
         }
 
-        //Error check
         let error = GetLastError();
 
         if error != 0 {
@@ -309,9 +314,12 @@ pub fn is_format_avail(format: u32) -> bool {
 pub fn count_formats() -> Result<i32, WindowsError> {
     let result = unsafe { CountClipboardFormats() };
 
-    if result == 0 { return_err!() }
-
-    Ok(result)
+    if result == 0 {
+        Err(get_last_error())
+    }
+    else {
+        Ok(result)
+    }
 }
 
 ///Registers a new clipboard format with specified name.
@@ -326,7 +334,10 @@ pub fn register_format<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<u
 
     let result = unsafe { RegisterClipboardFormatW(utf16_buff.as_ptr()) };
 
-    if result == 0 { return_err!() }
-
-    Ok(result)
+    if result == 0 {
+        Err(get_last_error())
+    }
+    else {
+        Ok(result)
+    }
 }
