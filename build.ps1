@@ -29,12 +29,12 @@ switch ($args[0])
         cargo build
     }
     "doc"   {
+        $master_hash = git log -1 --format="%s(%h %cd)" --date=short
         #remove old documentation just in case
-        $master_hash = git log -1 --format="%s|%h"
         Remove-Item -Recurse -ErrorAction SilentlyContinue -Force target\doc\
         cargo doc --no-deps
         if ($args[1] -eq "--update-pages") {
-            git checkout gh-pages
+            git checkout gh-pages -q
             Remove-Item -Recurse -ErrorAction SilentlyContinue -Force doc\
             Copy-item -Recurse target\doc\ doc\
             git diff --quiet HEAD
@@ -44,7 +44,11 @@ switch ($args[0])
                 git commit -m "Doc-update from $master_hash"
                 git push origin HEAD
             }
-            git checkout master
+            else {
+                echo ""
+                echo "Documens are up-to-date"
+            }
+            git checkout master -q
         }
     }
     "bot" {
@@ -61,8 +65,33 @@ switch ($args[0])
         git config --global user.name "AppVeyor bot"
         git config --global user.email "douman@gmx.se"
         git config remote.origin.url "https://$($env:git_token)@github.com/DoumanAsh/clipboard-win.git"
-        echo "build is done"
+        echo ""
+        echo "Build is done"
         .\build.ps1 doc --update-pages
+
+        $crates_io_ver=cargo search clipboard-win
+        $crates_io_ver = $crates_io_ver -match "\d{1,3}.\d{1,3}.\d{1,3}"
+        $crates_io_ver = $crates_io_ver.split()[1]
+        $crates_io_ver = $crates_io_ver.substring(1, $crates_io_ver.indexof(")")-1).split('.')
+
+        $crate = select-string Cargo.toml -Pattern "\d{1,3}.\d{1,3}.\d{1,3}"
+        $crate = $crate[0].tostring().split('=')[1].substring(2)
+        $crate = $crate.substring(0, $crate.indexof('"')).split('.')
+
+        $crates_io_ver = [System.Tuple]::Create($crates_io_ver[0], $crates_io_ver[1], $crates_io_ver[2])
+        $crate = [System.Tuple]::Create($crate[0], $crate[1], $crate[2])
+        if ( $crate[0] -gt $crates_io_ver[0]) {
+            cargo login $env:api
+            cargo publish
+            if ($LASTEXITCODE -eq 1) {
+                echo ""
+                echo "Unable to publish :("
+            }
+        }
+        else {
+            echo ""
+            echo "Crate is up-to-date on crates.io"
+        }
     }
     default { echo (">>>{0}: Incorrect command" -f $args[0]) }
 }
