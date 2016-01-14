@@ -30,6 +30,7 @@ switch ($args[0])
     }
     "doc"   {
         #remove old documentation just in case
+        $master_hash = git log -1 --format="%s|%h"
         Remove-Item -Recurse -ErrorAction SilentlyContinue -Force target\doc\
         cargo doc --no-deps
         if ($args[1] -eq "--update-pages") {
@@ -39,13 +40,29 @@ switch ($args[0])
             git diff --quiet HEAD
             if ($LASTEXITCODE -eq 1) {
                 #commit change in docs
-                git config -l
-                git add --all
-                git commit -m "Auto-update"
+                git add doc/
+                git commit -m "Doc-update from $master_hash"
                 git push origin HEAD
             }
             git checkout master
         }
+    }
+    "bot" {
+        if ( -Not $env:APPVEYOR) {
+            echo "Bot is supposed to run in AppVeyor. Exit..."
+            return
+        }
+        elseif ( $env:TARGET -ne "x86_64-pc-windows-gnu") {
+            return
+        }
+
+        git config --global credential.helper store
+        Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:git_token):x-oauth-basic@github.com\n"
+        git config --global user.name "AppVeyor bot"
+        git config --global user.email "douman@gmx.se"
+        git config remote.origin.url "https://$($env:git_token)@github.com/DoumanAsh/clipboard-win.git"
+        echo "build is done"
+        .\build.ps1 doc --update-pages
     }
     default { echo (">>>{0}: Incorrect command" -f $args[0]) }
 }

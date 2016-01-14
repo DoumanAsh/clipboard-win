@@ -17,9 +17,8 @@ environment:
 install:
   - ps: Start-FileDownload "https://static.rust-lang.org/dist/rust-beta-${env:TARGET}.exe"
   - rust-beta-%TARGET%.exe /VERYSILENT /NORESTART /DIR="C:\Rust"
+  - ps: Remove-Item "rust-beta-$env:TARGET.exe"
   - ps: $env:PATH="$env:PATH;C:\Rust\bin"
-  - rustc -V
-  - cargo -V
 
 build: false
 
@@ -29,4 +28,4 @@ test_script:
   - cargo test
 
 on_success:
-  - ps: if ($env:TARGET -eq "x86_64-pc-windows-gnu") { git config --global credential.helper store; Add-Content "$env:USERPROFILE\.git-credentials" "https://$($env:git_token):x-oauth-basic@github.com`n"; git config --global user.name "AppVeyor bot"; git config --global user.mail "douman@gmx.se"; echo "build is done"; .\build.ps1 doc --update-pages}
+  - powershell -version 3 -File build.ps1 bot
