@@ -36,6 +36,14 @@ switch ($args[0])
             git checkout gh-pages
             Remove-Item -Recurse -ErrorAction SilentlyContinue -Force doc\
             Copy-item -Recurse target\doc\ doc\
+            git diff --quiet HEAD
+            if ($LASTEXITCODE -eq 1) {
+                #commit change in docs
+                git add --all
+                git commit -m "Auto-update"
+                git push origin HEAD
+            }
+            git checkout master
         }
     }
     default { echo (">>>{0}: Incorrect command" -f $args[0]) }

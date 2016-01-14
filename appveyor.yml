@@ -7,8 +7,8 @@ branches:
 environment:
   matrix:
   - TARGET: x86_64-pc-windows-msvc
-  - TARGET: x86_64-pc-windows-gnu
   - TARGET: i686-pc-windows-gnu
+  - TARGET: x86_64-pc-windows-gnu
   api:
     secure: ZQiyxjBbshVpIVZbZl9h23yGuqlq+8j615c0B2z7VxdEAW1wggIfkebJqpgZclk2
 
@@ -25,3 +25,7 @@ test_script:
   - ps: $env:RUST_TEST_THREADS=1
   - ps: echo "let's save some clipboard!" | Clip
   - cargo test
+
+on_success:
+  - ps: $env:BUILD_NUM=$env:BUILD_NUM+1
+  - ps: if ($env:TARGET -eq x86_64-pc-windows-gnu) { git config --global user.name "AppVeyor bot"; echo "build is done"; .\build.ps1 doc --update-pages}

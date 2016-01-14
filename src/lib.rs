@@ -6,7 +6,7 @@
 //! ```
 //! extern crate clipboard_win;
 //!
-//! use clipboard_win::*;
+//! use clipboard_win::set_clipboard;
 //!
 //! fn main() {
 //!     println!("I set some clipboard text like a boss!");
