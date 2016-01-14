@@ -39,6 +39,7 @@ switch ($args[0])
             git diff --quiet HEAD
             if ($LASTEXITCODE -eq 1) {
                 #commit change in docs
+                git config -l
                 git add --all
                 git commit -m "Auto-update"
                 git push origin HEAD
