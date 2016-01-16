@@ -41,7 +41,7 @@ switch ($args[0])
             if ($LASTEXITCODE -eq 1) {
                 #commit change in docs
                 git add doc/
-                git commit -m "Doc-update from $master_hash"
+                git commit -m "Doc-update from [$master_hash]"
                 git push origin HEAD
             }
             else {
@@ -54,6 +54,10 @@ switch ($args[0])
     "bot" {
         if ( -Not $env:APPVEYOR) {
             echo "Bot is supposed to run in AppVeyor. Exit..."
+            return
+        }
+        elseif ($env:APPVEYOR_PULL_REQUEST_TITLE) {
+            echo "Skip pull request"
             return
         }
         elseif ( $env:TARGET -ne "x86_64-pc-windows-gnu") {
