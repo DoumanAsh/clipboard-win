@@ -71,7 +71,6 @@ switch ($args[0])
         git config remote.origin.url "https://$($env:git_token)@github.com/DoumanAsh/clipboard-win.git"
         echo ""
         echo "Build is done"
-        .\build.ps1 doc --update-pages
 
         $crates_io_ver=cargo search clipboard-win
         $crates_io_ver = $crates_io_ver -match "\d{1,3}.\d{1,3}.\d{1,3}"
@@ -90,6 +89,9 @@ switch ($args[0])
             if ($LASTEXITCODE -eq 1) {
                 echo ""
                 echo "Unable to publish :("
+            }
+            else {
+                .\build.ps1 doc --update-pages
             }
         }
         else {
