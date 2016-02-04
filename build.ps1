@@ -41,12 +41,12 @@ switch ($args[0])
             if ($LASTEXITCODE -eq 1) {
                 #commit change in docs
                 git add doc/
-                git commit -m "Doc-update from [$master_hash]"
+                git commit -m "Auto-update" -m "Commit: $master_hash"
                 git push origin HEAD
             }
             else {
                 echo ""
-                echo "Documens are up-to-date"
+                echo "Documents are up-to-date"
             }
             git checkout master -q
         }
