@@ -208,19 +208,8 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
     result
 }
 
-#[inline]
-///Returns format name based on it's code.
-///
-///# Note:
-///It is not possible to retrieve name of predefined clipboard format.
-///
-///# Return result:
-///
-///* ```Some``` String which contains the format's name.
-///* ```None``` If format name is incorrect or predefined.
-pub fn get_format_name(format: u32) -> Option<String> {
-    try_none!(wrapper::open_clipboard());
-    let result = wrapper::get_format_name(format);
-    try_none!(wrapper::close_clipboard());
-    result
-}
+//Re-export functions that do not require open/close
+pub use wrapper::{get_format_name,
+                  count_formats,
+                  register_format,
+                  is_format_avail};

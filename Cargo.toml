@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "1.7.0"
+version = "1.7.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Library to interact with Windows clipboard."
 repository = "https://github.com/DoumanAsh/clipboard-win"
