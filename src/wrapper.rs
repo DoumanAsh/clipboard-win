@@ -29,17 +29,20 @@ pub fn get_last_error() -> WindowsError {
     WindowsError(unsafe { GetLastError() })
 }
 
-#[inline(always)]
-unsafe fn rust_strlen8(buff_p: *const u8) -> usize {
+#[inline]
+///Generic strlen
+///
+///# Note:
+///
+///```Default``` is used instead of ```Zero```
+unsafe fn rust_strlen<T: Default + PartialEq>(buff_p: *const T) -> usize {
+    let zero = T::default();
     let mut idx: isize = 0;
-    while *buff_p.offset(idx) != 0 { idx += 1; }
-    idx as usize
-}
 
-#[inline(always)]
-unsafe fn rust_strlen16(buff_p: *const u16) -> usize {
-    let mut idx: isize = 0;
-    while *buff_p.offset(idx) != 0 { idx += 1; }
+    while *buff_p.offset(idx) != zero {
+        idx += 1;
+    }
+
     idx as usize
 }
 
@@ -198,7 +201,7 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
         }
         else {
             let text_p = GlobalLock(text_handler) as *const u16;
-            let text_s = std::slice::from_raw_parts(text_p, rust_strlen16(text_p));
+            let text_s = std::slice::from_raw_parts(text_p, rust_strlen(text_p));
 
             result = Ok(String::from_utf16_lossy(text_s));
             GlobalUnlock(text_handler);
@@ -230,7 +233,7 @@ pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
         }
         else {
             let text_p = GlobalLock(text_handler) as *const u8;
-            let text_vec: Vec<u8> = std::slice::from_raw_parts(text_p, rust_strlen8(text_p)).to_vec();
+            let text_vec: Vec<u8> = std::slice::from_raw_parts(text_p, rust_strlen(text_p)).to_vec();
 
             result = Ok(text_vec);
             GlobalUnlock(text_handler);
