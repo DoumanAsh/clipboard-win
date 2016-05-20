@@ -32,7 +32,7 @@ switch ($args[0])
         $master_hash = git log -1 --format="%s(%h %cd)" --date=short
         #remove old documentation just in case
         Remove-Item -Recurse -ErrorAction SilentlyContinue -Force target\doc\
-        cargo doc --no-deps
+        cargo doc --no-deps -p windows-error -p clipboard-win
         if ($args[1] -eq "--update-pages") {
             git checkout gh-pages -q
             Remove-Item -Recurse -ErrorAction SilentlyContinue -Force doc\

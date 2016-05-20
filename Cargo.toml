@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "1.7.1"
+version = "1.8.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Library to interact with Windows clipboard."
 repository = "https://github.com/DoumanAsh/clipboard-win"
@@ -12,6 +12,7 @@ keywords = ["Windows", "winapi", "clipboard"]
 winapi = "^0.2.5"
 user32-sys = "^0.2.0"
 kernel32-sys = "^0.2.1"
+windows-error = "^1.0.0"
 
 [lib]
 name = "clipboard_win"

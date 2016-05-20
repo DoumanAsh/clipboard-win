@@ -5,6 +5,9 @@
 
 extern crate user32;
 extern crate kernel32;
+extern crate windows_error;
+
+use super::windows_error::WindowsError;
 
 use winapi::minwindef::{HGLOBAL, UINT};
 use winapi::winnt::HANDLE;
@@ -16,7 +19,6 @@ use user32::{RegisterClipboardFormatW, CountClipboardFormats, IsClipboardFormatA
 use std;
 use std::os::windows::ffi::OsStrExt;
 
-use super::WindowsError;
 use super::clipboard_formats::*;
 
 ///Wrapper around ```GetLastError```.
@@ -26,7 +28,7 @@ use super::clipboard_formats::*;
 ///* ```WindowsError``` with last windows error
 #[inline]
 pub fn get_last_error() -> WindowsError {
-    WindowsError(unsafe { GetLastError() })
+    WindowsError::from_last_err()
 }
 
 #[inline]
@@ -262,7 +264,7 @@ pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
         let error = GetLastError();
 
         if error != 0 {
-            return Err(WindowsError(error));
+            return Err(WindowsError::new(0));
         }
     }
 
