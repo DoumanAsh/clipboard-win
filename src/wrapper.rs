@@ -1,6 +1,7 @@
 //!Provides direct wrappers to WinAPI functions.
 //!
 //!These functions omit calls to ```OpenClipboard``` and ```CloseClipboard```.
+//!
 //!Due to that most functions have requirements for them to be called.
 
 extern crate user32;
@@ -68,8 +69,9 @@ pub fn get_clipboard_seq_num() -> Option<u32> {
 #[inline]
 ///Wrapper around ```OpenClipboard```.
 ///
-///This function MUST be called only once until the clipboard is closed again with
-///```close_clipboard```.
+///# Post-conditions:
+///
+///* Clipboard can be accessed for read and write operations.
 pub fn open_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if OpenClipboard(std::ptr::null_mut()) == 0 {
@@ -83,7 +85,9 @@ pub fn open_clipboard() -> Result<(), WindowsError> {
 #[inline]
 ///Wrapper around ```CloseClipboard```.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn close_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if CloseClipboard() == 0 {
@@ -97,7 +101,9 @@ pub fn close_clipboard() -> Result<(), WindowsError> {
 #[inline]
 ///Wrapper around ```EmptyClipboard```.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn empty_clipboard() -> Result<(), WindowsError> {
     unsafe {
         if EmptyClipboard() == 0 {
@@ -110,7 +116,9 @@ pub fn empty_clipboard() -> Result<(), WindowsError> {
 
 ///Wrapper around ```SetClipboardData``` to set unicode text.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
     const FLAG_GHND: UINT = 66;
     let text = text.as_ref();
@@ -152,7 +160,9 @@ pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(),
 ///* ```data``` buffer with raw data to be copied.
 ///* ```format``` clipboard format code.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
     const FLAG_GHND: UINT = 66;
     unsafe {
@@ -187,12 +197,14 @@ pub fn set_clipboard_raw(data: &[u8], format: u32) -> Result<(), WindowsError> {
 
 ///Wrapper around ```GetClipboardData``` with hardcoded UTF16 format.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
-///
 ///# Return result:
 ///
 ///* ```Ok``` Content of clipboard which is stored in ```String```.
 ///* ```Err``` Contains ```WindowsError```.
+///
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn get_clipboard_string() -> Result<String, WindowsError> {
     let result: Result<String, WindowsError>;
     unsafe {
@@ -215,8 +227,6 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
 
 ///Wrapper around ```GetClipboardData```.
 ///
-///This function MUST be called after a successful call of ```open_clipboard```.
-///
 ///# Parameters:
 ///
 ///* ```format``` clipboard format code.
@@ -225,6 +235,10 @@ pub fn get_clipboard_string() -> Result<String, WindowsError> {
 ///
 ///* ```Ok``` Contains buffer with raw data.
 ///* ```Err``` Contains ```WindowsError```.
+///
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
 pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
     let result: Result<Vec<u8>, WindowsError>;
     unsafe {
