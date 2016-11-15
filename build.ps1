@@ -73,9 +73,8 @@ switch ($args[0])
         echo "Build is done"
 
         $crates_io_ver=cargo search clipboard-win
-        $crates_io_ver = $crates_io_ver -match "\d{1,3}.\d{1,3}.\d{1,3}"
-        $crates_io_ver = $crates_io_ver.split()[1]
-        $crates_io_ver = $crates_io_ver.substring(1, $crates_io_ver.indexof(")")-1).split('.')
+        $crates_io_ver = [regex]::match($crates_io_ver, "(\d{1,3}.\d{1,3}.\d{1,3})").Groups[1].Value
+        $crates_io_ver = $crates_io_ver.split('.')
 
         $crate = select-string Cargo.toml -Pattern "\d{1,3}.\d{1,3}.\d{1,3}"
         $crate = $crate[0].tostring().split('=')[1].substring(2)

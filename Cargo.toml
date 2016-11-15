@@ -1,14 +1,14 @@
 [package]
 name = "clipboard-win"
-version = "1.8.0"
+version = "1.8.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Library to interact with Windows clipboard."
 repository = "https://github.com/DoumanAsh/clipboard-win"
-documentation = "http://doumanash.github.io/clipboard-win/doc/clipboard_win/index.html"
+documentation = "https://docs.rs/crate/clipboard-win/"
 license = "MIT"
 keywords = ["Windows", "winapi", "clipboard"]
 
-[dependencies]
+[target.'cfg(windows)'.dependencies]
 winapi = "^0.2.5"
 user32-sys = "^0.2.0"
 kernel32-sys = "^0.2.1"

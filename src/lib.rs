@@ -1,3 +1,4 @@
+#![cfg(windows)]
 //! Clipboard WinAPI
 //!
 //! This crate provide simple means to operate with Windows clipboard.
