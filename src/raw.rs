@@ -11,6 +11,7 @@
 //! After that Clipboard cannot be opened any more until `close()` is called.
 
 use ::std;
+use std::cmp;
 use std::os::windows::ffi::OsStrExt;
 use std::os::raw::{
     c_int,
@@ -177,18 +178,60 @@ pub fn get(format: u32, result: &mut [u8]) -> io::Result<usize> {
                 return Err(utils::get_last_error());
             }
 
-            let data_size = GlobalSize(clipboard_data) as usize;
-            let data_size = if data_size > result.len() {
-                result.len()
-            }
-            else {
-                data_size
-            };
+            let data_size = cmp::min(GlobalSize(clipboard_data) as usize, result.len());
 
             ptr::copy_nonoverlapping(data_ptr, result.as_mut_ptr(), data_size);
             GlobalUnlock(clipboard_data);
 
             Ok(data_size)
+        }
+    }
+}
+
+///Retrieves String from `CF_UNICODETEXT` format
+///
+///Specialized version of [get](fn.get.html) to avoid unnecessary allocations.
+///
+///# Note:
+///
+///Usually WinAPI returns strings with null terminated character at the end.
+///This character is trimmed.
+///
+///# Pre-conditions:
+///
+///* `open_clipboard` has been called.
+pub fn get_string() -> io::Result<String> {
+    let clipboard_data = unsafe { GetClipboardData(formats::CF_UNICODETEXT) };
+
+    if clipboard_data.is_null() {
+        Err(utils::get_last_error())
+    }
+    else {
+        unsafe {
+            let data_ptr = GlobalLock(clipboard_data) as *const u16;
+
+            if data_ptr.is_null() {
+                return Err(utils::get_last_error());
+            }
+
+            let data_size = GlobalSize(clipboard_data) as usize / std::mem::size_of::<u16>();
+
+            let str_ptr = std::slice::from_raw_parts(data_ptr, data_size);
+            let mut result = String::from_utf16_lossy(str_ptr);
+
+            {
+                //It seems WinAPI always supposed to have at the end null char.
+                //But just to be safe let's check for it and only then remove.
+                if let Some(last) = result.pop() {
+                    if last != '\0' {
+                        result.push(last);
+                    }
+                }
+            }
+
+            GlobalUnlock(clipboard_data);
+
+            Ok(result)
         }
     }
 }

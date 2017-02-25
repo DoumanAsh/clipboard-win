@@ -40,12 +40,33 @@
 //!     let result = Clipboard::new().unwrap().get(formats::CF_TEXT, &mut buffer).unwrap();
 //!     assert_eq!(str::from_utf8(&buffer[..result]).unwrap(), text);
 //! }
+//! ```
+//!
+//!## Set and get String
+//!
+//! ```rust
+//! extern crate clipboard_win;
+//! use clipboard_win::Clipboard;
+//!
+//! use std::str;
+//!
+//! fn main() {
+//!     let text = "For my waifu!";
+//!     Clipboard::new().unwrap().set_string(text);
+//!
+//!     let result = Clipboard::new().unwrap().get_string().unwrap();
+//!     assert_eq!(text, result);
+//! }
+//! ```
 
 extern crate winapi;
 extern crate user32;
 extern crate kernel32;
 
 use std::io;
+use std::slice;
+use std::mem;
+use std::os::windows::ffi::OsStrExt;
 
 mod utils;
 pub mod formats;
@@ -93,12 +114,34 @@ impl Clipboard {
         raw::set(format, data).map(|_| self)
     }
 
+    ///Sets `str` or `String` onto clipboard as Unicode format.
+    ///
+    ///Under hood it transforms Rust `UTF-8` String into `UTF-16`
+    #[inline]
+    pub fn set_string<T: ?Sized + AsRef<std::ffi::OsStr>>(&self, data: &T) -> io::Result<&Clipboard> {
+        let data = data.as_ref();
+        let mut utf16_buff = data.encode_wide().collect::<Vec<u16>>();
+        utf16_buff.push(0);
+
+        let data = unsafe { slice::from_raw_parts(utf16_buff.as_ptr() as *const u8,
+                                                  utf16_buff.len() * mem::size_of::<u16>()) };
+        raw::set(formats::CF_UNICODETEXT, data).map(|_| self)
+    }
+
     ///Retrieves data of specified format from clipboard.
     ///
     ///Wraps `raw::get()`
     #[inline]
     pub fn get(&self, format: u32, data: &mut [u8]) -> io::Result<usize> {
         raw::get(format, data)
+    }
+
+    ///Retrieves `String` of `CF_UNICODETEXT` format from clipboard.
+    ///
+    ///Wraps `raw::get_string()`
+    #[inline]
+    pub fn get_string(&self) -> io::Result<String> {
+        raw::get_string()
     }
 
     ///Enumerator over all formats on clipboard..

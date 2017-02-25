@@ -18,6 +18,7 @@ fn seq_num() {
 fn set_data() {
     let format = formats::CF_TEXT;
     let text = "For my waifu!\0"; //For text we need to pass C-like string
+    let wide_text = "メヒーシャ";
     let data = text.as_bytes();
     let mut buff = [0u8; 52];
     let mut small_buff = [0u8; 4];
@@ -34,14 +35,14 @@ fn set_data() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 0);
 
+    //Check simple set of utf-8 bytes
     let seq_num_before = Clipboard::seq_num();
-
     let result = clipboard.set(format, data);
     assert!(result.is_ok());
-
     let seq_num_after = Clipboard::seq_num();
     assert!(seq_num_before != seq_num_after);
 
+    //Check simple get of utf-8 bytes
     let result = clipboard.get(format, &mut buff);
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -49,6 +50,7 @@ fn set_data() {
     let result = str::from_utf8(&buff[..result]).unwrap();
     assert_eq!(text, result);
 
+    //Check truncated get of utf-8 bytes
     let result = clipboard.get(format, &mut small_buff);
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -56,4 +58,18 @@ fn set_data() {
     let result = str::from_utf8(&buff[..result]).unwrap();
     assert_eq!(&text[..small_buff.len()], result);
 
+    //Check set of wide utf-8 bytes
+    let seq_num_before = Clipboard::seq_num();
+    let result = clipboard.set_string(wide_text);
+    assert!(result.is_ok());
+    assert!(Clipboard::is_format_avail(formats::CF_UNICODETEXT));
+    let seq_num_after = Clipboard::seq_num();
+    assert!(seq_num_before != seq_num_after);
+
+    //Check get of wide utf-8 bytes
+    let result = clipboard.get_string();
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), wide_text.len());
+    assert_eq!(result, wide_text);
 }
