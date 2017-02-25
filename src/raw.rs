@@ -6,9 +6,9 @@
 //!
 //!### Open clipboard
 //! To access any information inside clipboard it is necessary to open it by means of
-//! `open()`.
+//! [open()](fn.open.html).
 //!
-//! After that Clipboard cannot be opened any more until `close()` is called.
+//! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
 use ::std;
 use std::cmp;
@@ -78,7 +78,7 @@ pub fn open() -> io::Result<()> {
 ///
 ///# Pre-conditions:
 ///
-///* `open` has been called.
+///* [open()](fn.open.html) has been called.
 pub fn close() -> io::Result<()> {
     unsafe {
         if CloseClipboard() == 0 {
@@ -96,7 +96,7 @@ pub fn close() -> io::Result<()> {
 ///
 ///# Pre-conditions:
 ///
-///* `open` has been called.
+///* [open()](fn.open.html) has been called.
 pub fn empty() -> io::Result<()> {
     unsafe {
         if EmptyClipboard() == 0 {
@@ -131,7 +131,7 @@ pub fn seq_num() -> Option<u32> {
 ///
 ///# Pre-conditions:
 ///
-///* `open` has been called.
+///* [open()](fn.open.html) has been called.
 ///
 ///# Returns:
 ///
@@ -155,7 +155,7 @@ pub fn size(format: u32) -> Option<usize> {
 ///
 ///# Pre-conditions:
 ///
-///* `open_clipboard` has been called.
+///* [open()](fn.open.html) has been called.
 ///
 ///# Note:
 ///
@@ -199,7 +199,7 @@ pub fn get(format: u32, result: &mut [u8]) -> io::Result<usize> {
 ///
 ///# Pre-conditions:
 ///
-///* `open_clipboard` has been called.
+///* [open()](fn.open.html) has been called.
 pub fn get_string() -> io::Result<String> {
     let clipboard_data = unsafe { GetClipboardData(formats::CF_UNICODETEXT) };
 
@@ -216,8 +216,8 @@ pub fn get_string() -> io::Result<String> {
 
             let data_size = GlobalSize(clipboard_data) as usize / std::mem::size_of::<u16>();
 
-            let str_ptr = std::slice::from_raw_parts(data_ptr, data_size);
-            let mut result = String::from_utf16_lossy(str_ptr);
+            let str_slice = std::slice::from_raw_parts(data_ptr, data_size);
+            let mut result = String::from_utf16_lossy(str_slice);
 
             {
                 //It seems WinAPI always supposed to have at the end null char.
@@ -242,7 +242,7 @@ pub fn get_string() -> io::Result<String> {
 ///
 ///# Pre-conditions:
 ///
-///* `open_clipboard` has been called.
+///* [open()](fn.open.html) has been called.
 pub fn set(format: u32, data: &[u8]) -> io::Result<()> {
     const GHND: c_uint = 0x42;
     let size = data.len();
@@ -300,7 +300,7 @@ pub fn count_formats() -> io::Result<i32> {
 ///
 ///# Pre-conditions:
 ///
-///* `open` has been called.
+///* [open()](fn.open.html) has been called.
 pub struct EnumFormats {
     idx: u32
 }
