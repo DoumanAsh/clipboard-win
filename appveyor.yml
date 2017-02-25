@@ -6,11 +6,11 @@ branches:
 
 environment:
   matrix:
-  - TARGET: x86_64-pc-windows-msvc
-    CHANNEL: beta
-  - TARGET: i686-pc-windows-gnu
-    CHANNEL: beta
   - TARGET: x86_64-pc-windows-gnu
+    CHANNEL: beta
+  - TARGET: i686-pc-windows-msvc
+    CHANNEL: beta
+  - TARGET: x86_64-pc-windows-msvc
     CHANNEL: beta
   api:
     secure: ZQiyxjBbshVpIVZbZl9h23yGuqlq+8j615c0B2z7VxdEAW1wggIfkebJqpgZclk2
