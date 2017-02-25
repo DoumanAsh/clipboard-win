@@ -1,91 +1,59 @@
 extern crate clipboard_win;
 
-use clipboard_win::*;
-use clipboard_win::wrapper::{open_clipboard, close_clipboard, set_clipboard_raw, get_clipboard_seq_num};
+use std::str;
 
-//NOTE: parallel running may cause fail.
+use clipboard_win::Clipboard;
+use clipboard_win::formats;
+use clipboard_win::raw;
 
 #[test]
-fn get_clipboard_formats_test() {
-    let clipboard_formats = get_clipboard_formats();
+fn seq_num() {
+    let result = raw::seq_num();
 
-    assert!(clipboard_formats.is_ok());
-
-    let clipboard_formats = clipboard_formats.unwrap();
-    println!("get_clipboard_formats_test: clipboard formats: {:?}", clipboard_formats);
-    for format in clipboard_formats {
-        if let Some(format_name) = get_format_name(format) {
-            println!("{}={}", format, format_name);
-        }
-    }
+    assert!(result.is_some());
+    assert!(result.unwrap() != 0);
 }
 
 #[test]
-fn get_clipboard_seq_num_test() {
-    assert!(get_clipboard_seq_num().is_some());
-}
+fn set_data() {
+    let format = formats::CF_TEXT;
+    let text = "For my waifu!\0"; //For text we need to pass C-like string
+    let data = text.as_bytes();
+    let mut buff = [0u8; 52];
+    let mut small_buff = [0u8; 4];
 
-#[test]
-fn set_clipboard_test() {
-    let test_array = vec!["ololo", "1234", "1234567891234567891234567891234567891", "12345678912345678912345678912345678912"];
-    for expected_string in test_array {
-        assert!(set_clipboard(expected_string).is_ok());
+    let clipboard = Clipboard::new();
+    assert!(clipboard.is_ok());
+    let clipboard = clipboard.unwrap();
 
-        let result = get_clipboard_string();
-        assert!(result.is_ok());
-        let result = result.unwrap();
+    let result = clipboard.empty();
+    assert!(result.is_ok());
+    let format_num = clipboard.enum_formats().count();
+    assert_eq!(format_num, 0);
+    let result = Clipboard::count_formats();
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 0);
 
-        println!("set_clipboard_test: Clipboard: {}", result);
-        println!("set_clipboard_test: Expected:  {}", expected_string);
-        assert!(result == expected_string);
-    }
-}
+    let seq_num_before = Clipboard::seq_num();
 
-#[test]
-fn get_clipboard_test() {
-    let result = get_clipboard_string();
-    println!("{:?}", result);
+    let result = clipboard.set(format, data);
     assert!(result.is_ok());
 
-    println!("get_clipboard_test: Clipboard: {}", result.unwrap());
-}
+    let seq_num_after = Clipboard::seq_num();
+    assert!(seq_num_before != seq_num_after);
 
-#[test]
-fn is_format_avail_test() {
-    assert!(is_format_avail(13)); //default unicode format
-    assert!(!is_format_avail(66613666));
-}
-
-#[test]
-fn count_formats_test() {
-    let result = count_formats();
-
-    assert!(result.is_ok());
-
-    let result = result.unwrap();
-    println!("count_formats_test: number of formats={}", result);
-    assert!(result > 0);
-}
-
-#[test]
-fn register_format_test() {
-    let new_format = register_format("text");
-    assert!(new_format.is_ok());
-
-    let new_format = new_format.unwrap();
-    println!("register_format_test: new_format={}", new_format);
-    assert!(open_clipboard().is_ok());
-
-    let expect_buf = [13, 12, 122, 1];
-    println!("register_format_test: set clipboard={:?}", expect_buf);
-    assert!(set_clipboard_raw(&expect_buf, new_format).is_ok());
-    assert!(close_clipboard().is_ok());
-    assert!(is_format_avail(new_format));
-
-    let result = get_clipboard(new_format);
+    let result = clipboard.get(format, &mut buff);
     assert!(result.is_ok());
     let result = result.unwrap();
+    assert_eq!(result, data.len());
+    let result = str::from_utf8(&buff[..result]).unwrap();
+    assert_eq!(text, result);
 
-    assert!(result == expect_buf);
-    println!("register_format_test: saved clipboard={:?}", result);
+    let result = clipboard.get(format, &mut small_buff);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result, small_buff.len());
+    let result = str::from_utf8(&buff[..result]).unwrap();
+    assert_eq!(&text[..small_buff.len()], result);
+
 }

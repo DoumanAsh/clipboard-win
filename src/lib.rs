@@ -1,115 +1,135 @@
 #![cfg(windows)]
-//! Clipboard WinAPI
-//!
 //! This crate provide simple means to operate with Windows clipboard.
 //!
-//! # Example:
-//! ```
+//!# Clipboard
+//!
+//! All read and write access to Windows clipboard requires user to open it.
+//!
+//! For your convenience you can use [Clipboard](struct.Clipboard.html) struct that opens it at creation
+//! and closes on its  drop.
+//!
+//! Alternatively you can access all functionality directly through [raw module](raw/index.html).
+//!
+//! Below you can find examples of usage.
+//!
+//!## Empty clipboard
+//!
+//! ```rust
 //! extern crate clipboard_win;
 //!
-//! use clipboard_win::set_clipboard;
+//! use clipboard_win::Clipboard;
 //!
 //! fn main() {
-//!     println!("I set some clipboard text like a boss!");
-//!     set_clipboard("for my waifu!");
+//!     Clipboard::new().unwrap().empty();
 //! }
 //! ```
+//!## Set and get raw data
+//! ```rust
+//! extern crate clipboard_win;
+//! use clipboard_win::formats;
+//!
+//! use clipboard_win::Clipboard;
+//!
+//! use std::str;
+//!
+//! fn main() {
+//!     let text = "For my waifu!\0"; //For text we need to pass C-like string
+//!     Clipboard::new().unwrap().set(formats::CF_TEXT, text.as_bytes());
+//!
+//!     let mut buffer = [0u8; 52];
+//!     let result = Clipboard::new().unwrap().get(formats::CF_TEXT, &mut buffer).unwrap();
+//!     assert_eq!(str::from_utf8(&buffer[..result]).unwrap(), text);
+//! }
 
 extern crate winapi;
 extern crate user32;
 extern crate kernel32;
-extern crate windows_error;
 
-use windows_error::WindowsError;
+use std::io;
 
-mod constants;
-pub mod clipboard_formats;
+mod utils;
+pub mod formats;
+pub mod raw;
 
-pub mod wrapper;
+pub use raw::{
+    register_format
+};
 
-///try clone that returns None instead of Err<T>
-macro_rules! try_none {
-    ($expr:expr) => (match $expr {
-        Ok(val) => val,
-        Err(_) => return None,
-    })
+///Clipboard accessor.
+///
+///# Note:
+///
+///You can have only one such accessor across your program.
+pub struct Clipboard {
+    inner: ()
 }
 
-///Checks format availability.
-///
-///Returns WinError if it is not available.
-macro_rules! check_format {
-    ($format:expr) => {
-        if !wrapper::is_format_avail($format) {
-            return Err(WindowsError::new(0))
-        }
+impl Clipboard {
+    ///Initializes new clipboard accessor.
+    ///
+    ///Attempts to open clipboard.
+    #[inline]
+    pub fn new() -> io::Result<Clipboard> {
+        raw::open().map(|_| Clipboard {inner: ()})
+    }
+
+    ///Empties clipboard.
+    #[inline]
+    pub fn empty(&self) -> io::Result<&Clipboard> {
+        raw::empty().map(|_| self)
+    }
+
+    ///Retrieves size of clipboard content.
+    #[inline]
+    pub fn size(&self, format: u32) -> Option<u64> {
+        raw::size(format)
+    }
+
+    ///Sets data onto clipboard with specified format.
+    ///
+    ///Wraps `raw::set()`
+    #[inline]
+    pub fn set(&self, format: u32, data: &[u8]) -> io::Result<&Clipboard> {
+        raw::set(format, data).map(|_| self)
+    }
+
+    ///Retrieves data of specified format from clipboard.
+    ///
+    ///Wraps `raw::get()`
+    #[inline]
+    pub fn get(&self, format: u32, data: &mut [u8]) -> io::Result<usize> {
+        raw::get(format, data)
+    }
+
+    ///Enumerator over all formats on clipboard..
+    #[inline]
+    pub fn enum_formats(&self) -> raw::EnumFormats {
+        raw::EnumFormats::new()
+    }
+
+    ///Returns Clipboard sequence number.
+    #[inline]
+    pub fn seq_num() -> Option<u32> {
+        raw::seq_num()
+    }
+
+    ///Determines whenever provided clipboard format is available on clipboard or not.
+    #[inline]
+    pub fn is_format_avail(format: u32) -> bool {
+        raw::is_format_avail(format)
+    }
+
+    ///Retrieves number of currently available formats on clipboard.
+    #[inline]
+    pub fn count_formats() -> io::Result<i32> {
+        raw::count_formats()
+    }
+
+}
+
+impl Drop for Clipboard {
+    fn drop(&mut self) {
+        let _ = raw::close();
+        self.inner
     }
 }
-
-#[inline]
-///Set clipboard with text.
-pub fn set_clipboard<T: ?Sized + AsRef<std::ffi::OsStr>>(text: &T) -> Result<(), WindowsError> {
-    try!(wrapper::open_clipboard());
-    let result = wrapper::set_clipboard(text);
-    try!(wrapper::close_clipboard());
-    result
-}
-
-#[inline]
-///Retrieves clipboard content in UTF16 format and convert it to String.
-///
-///# Return result:
-///
-///* ```Ok``` Content of clipboard which is stored in ```String```.
-///* ```Err``` Contains ```WindowsError```.
-pub fn get_clipboard_string() -> Result<String, WindowsError> {
-    //If there is no such format on clipboard then we can return right now
-    //From point of view Windows this is not an error case, but we still unable to get anything.
-    check_format!(clipboard_formats::CF_UNICODETEXT);
-
-    try!(wrapper::open_clipboard());
-    let result = wrapper::get_clipboard_string();
-    try!(wrapper::close_clipboard());
-    result
-}
-
-#[inline]
-///Retrieves clipboard content.
-///
-///# Parameters:
-///
-///* ```format``` clipboard format code.
-///
-///# Return result:
-///
-///* ```Ok``` Contains buffer with raw data.
-///* ```Err``` Contains ```WindowsError```.
-pub fn get_clipboard(format: u32) -> Result<Vec<u8>, WindowsError> {
-    //see comment get_clipboard_string()
-    check_format!(format);
-
-    try!(wrapper::open_clipboard());
-    let result = wrapper::get_clipboard(format);
-    try!(wrapper::close_clipboard());
-    result
-}
-
-#[inline]
-///Extracts available clipboard formats.
-///
-///# Return result:
-///
-///* ```Ok``` Vector of available formats.
-///* ```Err``` Error description.
-pub fn get_clipboard_formats() -> Result<Vec<u32>, WindowsError> {
-    try!(wrapper::open_clipboard());
-    let result = wrapper::get_clipboard_formats();
-    try!(wrapper::close_clipboard());
-    result
-}
-
-//Re-export functions that do not require open/close
-pub use wrapper::{get_format_name,
-                  count_formats,
-                  register_format,
-                  is_format_avail};

@@ -1,18 +1,25 @@
 [package]
 name = "clipboard-win"
-version = "1.8.1"
+version = "2.0.0"
 authors = ["Douman <douman@gmx.se>"]
-description = "Library to interact with Windows clipboard."
+description = "Provides simple way to interact with Windows clipboard."
+license = "MIT"
+
+keywords = ["Windows", "winapi", "clipboard"]
+categories = []
+
 repository = "https://github.com/DoumanAsh/clipboard-win"
 documentation = "https://docs.rs/crate/clipboard-win/"
-license = "MIT"
-keywords = ["Windows", "winapi", "clipboard"]
+
+readme = "README.md"
+
+[badges]
+appveyor = { repository = "https://github.com/DoumanAsh/clipboard-win", branch = "master", service = "github" }
 
 [target.'cfg(windows)'.dependencies]
 winapi = "^0.2.5"
 user32-sys = "^0.2.0"
 kernel32-sys = "^0.2.1"
-windows-error = "^1.0.0"
 
 [lib]
 name = "clipboard_win"
