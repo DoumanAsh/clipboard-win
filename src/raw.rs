@@ -22,6 +22,10 @@ use std::io;
 use ::utils;
 use ::formats;
 
+use winapi::basetsd::{
+    SIZE_T
+};
+
 use kernel32::{
     GlobalSize,
     GlobalLock,
@@ -131,7 +135,7 @@ pub fn seq_num() -> Option<u32> {
 ///# Returns:
 ///
 ///Size in bytes if format presents on clipboard.
-pub fn size(format: u32) -> Option<u64> {
+pub fn size(format: u32) -> Option<usize> {
     let clipboard_data = unsafe {GetClipboardData(format)};
 
     if clipboard_data.is_null() {
@@ -139,7 +143,7 @@ pub fn size(format: u32) -> Option<u64> {
     }
     else {
         unsafe {
-            Some(GlobalSize(clipboard_data))
+            Some(GlobalSize(clipboard_data) as usize)
         }
     }
 }
@@ -200,7 +204,7 @@ pub fn set(format: u32, data: &[u8]) -> io::Result<()> {
     const GHND: c_uint = 0x42;
     let size = data.len();
 
-    let alloc_handle = unsafe { GlobalAlloc(GHND, size as u64) };
+    let alloc_handle = unsafe { GlobalAlloc(GHND, size as SIZE_T) };
 
     if alloc_handle.is_null() {
         Err(utils::get_last_error())

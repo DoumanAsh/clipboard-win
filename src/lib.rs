@@ -81,7 +81,7 @@ impl Clipboard {
 
     ///Retrieves size of clipboard content.
     #[inline]
-    pub fn size(&self, format: u32) -> Option<u64> {
+    pub fn size(&self, format: u32) -> Option<usize> {
         raw::size(format)
     }
 
