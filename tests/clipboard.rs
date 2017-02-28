@@ -5,6 +5,10 @@ use std::str;
 use clipboard_win::Clipboard;
 use clipboard_win::formats;
 use clipboard_win::raw;
+use clipboard_win::{
+    get_clipboard_string,
+    set_clipboard_string
+};
 
 #[test]
 fn seq_num() {
@@ -72,4 +76,21 @@ fn set_data() {
     let result = result.unwrap();
     assert_eq!(result.len(), wide_text.len());
     assert_eq!(result, wide_text);
+
+    //Shortcuts
+    //Check set of wide utf-8 bytes
+    let seq_num_before = Clipboard::seq_num();
+    let result = set_clipboard_string(wide_text);
+    assert!(result.is_ok());
+    assert!(Clipboard::is_format_avail(formats::CF_UNICODETEXT));
+    let seq_num_after = Clipboard::seq_num();
+    assert!(seq_num_before != seq_num_after);
+
+    //Check get of wide utf-8 bytes
+    let result = get_clipboard_string();
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), wide_text.len());
+    assert_eq!(result, wide_text);
+
 }

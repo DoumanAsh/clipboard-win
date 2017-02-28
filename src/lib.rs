@@ -110,22 +110,22 @@ impl Clipboard {
     ///
     ///Wraps `raw::set()`
     #[inline]
-    pub fn set(&self, format: u32, data: &[u8]) -> io::Result<&Clipboard> {
-        raw::set(format, data).map(|_| self)
+    pub fn set(&self, format: u32, data: &[u8]) -> io::Result<()> {
+        raw::set(format, data)
     }
 
     ///Sets `str` or `String` onto clipboard as Unicode format.
     ///
     ///Under hood it transforms Rust `UTF-8` String into `UTF-16`
     #[inline]
-    pub fn set_string<T: ?Sized + AsRef<std::ffi::OsStr>>(&self, data: &T) -> io::Result<&Clipboard> {
+    pub fn set_string<T: ?Sized + AsRef<std::ffi::OsStr>>(&self, data: &T) -> io::Result<()> {
         let data = data.as_ref();
         let mut utf16_buff = data.encode_wide().collect::<Vec<u16>>();
         utf16_buff.push(0);
 
         let data = unsafe { slice::from_raw_parts(utf16_buff.as_ptr() as *const u8,
                                                   utf16_buff.len() * mem::size_of::<u16>()) };
-        raw::set(formats::CF_UNICODETEXT, data).map(|_| self)
+        raw::set(formats::CF_UNICODETEXT, data)
     }
 
     ///Retrieves data of specified format from clipboard.
@@ -167,7 +167,6 @@ impl Clipboard {
     pub fn count_formats() -> io::Result<i32> {
         raw::count_formats()
     }
-
 }
 
 impl Drop for Clipboard {
@@ -175,4 +174,20 @@ impl Drop for Clipboard {
         let _ = raw::close();
         self.inner
     }
+}
+
+///Shortcut to retrieve string from clipboard.
+///
+///It opens clipboard and gets string, if possible.
+#[inline]
+pub fn get_clipboard_string() -> io::Result<String> {
+    Clipboard::new()?.get_string()
+}
+
+///Shortcut to set string onto clipboard.
+///
+///It opens clipboard and attempts to set string.
+#[inline]
+pub fn set_clipboard_string<T: ?Sized + AsRef<std::ffi::OsStr>>(data: &T) -> io::Result<()> {
+    Clipboard::new()?.set_string(data)
 }
