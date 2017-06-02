@@ -69,13 +69,27 @@ fn set_data() {
     assert!(Clipboard::is_format_avail(formats::CF_UNICODETEXT));
     let seq_num_after = Clipboard::seq_num();
     assert!(seq_num_before != seq_num_after);
-
     //Check get of wide utf-8 bytes
     let result = clipboard.get_string();
     assert!(result.is_ok());
     let result = result.unwrap();
     assert_eq!(result.len(), wide_text.len());
     assert_eq!(result, wide_text);
+
+    //Try to copy & paste some url
+    let url = "https://duckduckgo.com/html ";
+    let seq_num_before = Clipboard::seq_num();
+    let result = clipboard.set_string(url);
+    assert!(Clipboard::is_format_avail(formats::CF_UNICODETEXT));
+    assert!(result.is_ok());
+    let seq_num_after = Clipboard::seq_num();
+    assert!(seq_num_before != seq_num_after);
+
+    let result = clipboard.get_string();
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), url.len());
+    assert_eq!(result, url);
 
     //Shortcuts
     //Check set of wide utf-8 bytes
@@ -92,5 +106,4 @@ fn set_data() {
     let result = result.unwrap();
     assert_eq!(result.len(), wide_text.len());
     assert_eq!(result, wide_text);
-
 }
