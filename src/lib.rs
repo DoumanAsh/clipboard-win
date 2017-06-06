@@ -1,6 +1,12 @@
 #![cfg(windows)]
 //! This crate provide simple means to operate with Windows clipboard.
 //!
+//!# Note keeping Clipboard around:
+//!
+//! In Windows [Clipboard](struct.Clipboard.html) opens globally and only one application can set data onto format at the time.
+//!
+//! Therefore as soon as operations are finished, user is advised to close [Clipboard](struct.Clipboard.html).
+//!
 //!# Clipboard
 //!
 //! All read and write access to Windows clipboard requires user to open it.
@@ -58,6 +64,7 @@
 //!     assert_eq!(text, result);
 //! }
 //! ```
+//!
 
 extern crate winapi;
 extern crate user32;
@@ -81,6 +88,13 @@ pub use raw::{
 ///# Note:
 ///
 ///You can have only one such accessor across your program.
+///
+///# Warning:
+///
+///In Windows Clipboard opens globally and only one application can set data
+///onto format at the time.
+///
+///Therefore as soon as operations are finished, user is advised to close Clipboard.
 pub struct Clipboard {
     inner: ()
 }
