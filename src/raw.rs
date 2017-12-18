@@ -10,6 +10,8 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
+extern crate winapi;
+
 use ::std;
 use std::cmp;
 use std::os::windows::ffi::OsStrExt;
@@ -23,11 +25,11 @@ use std::io;
 use ::utils;
 use ::formats;
 
-use winapi::basetsd::{
+use self::winapi::shared::basetsd::{
     SIZE_T
 };
 
-use kernel32::{
+use self::winapi::um::winbase::{
     GlobalSize,
     GlobalLock,
     GlobalUnlock,
@@ -35,7 +37,7 @@ use kernel32::{
     GlobalFree
 };
 
-use user32::{
+use self::winapi::um::winuser::{
     OpenClipboard,
     CloseClipboard,
     EmptyClipboard,
