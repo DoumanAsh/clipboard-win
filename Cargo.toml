@@ -1,12 +1,12 @@
 [package]
 name = "clipboard-win"
-version = "2.1.1"
+version = "2.1.2"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "MIT"
 
 keywords = ["Windows", "winapi", "clipboard"]
-categories = []
+categories = ["clipboard"]
 
 repository = "https://github.com/DoumanAsh/clipboard-win"
 documentation = "https://docs.rs/clipboard-win/2.1.0/x86_64-pc-windows-msvc/clipboard_win/"
@@ -32,3 +32,7 @@ features = [
 name = "clipboard_win"
 path = "src/lib.rs"
 test = false
+
+[features]
+# Do not use lossy UTF-16 to UTF-8 conversion
+utf16error = []

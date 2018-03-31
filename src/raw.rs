@@ -219,16 +219,21 @@ pub fn get_string() -> io::Result<String> {
             let data_size = GlobalSize(clipboard_data) as usize / std::mem::size_of::<u16>();
 
             let str_slice = std::slice::from_raw_parts(data_ptr, data_size);
+            #[cfg(not(feature = "utf16error"))]
             let mut result = String::from_utf16_lossy(str_slice);
-
-            {
-                //It seems WinAPI always supposed to have at the end null char.
-                //But just to be safe let's check for it and only then remove.
-                if let Some(last) = result.pop() {
-                    if last != '\0' {
-                        result.push(last);
-                    }
+            #[cfg(feature = "utf16error")]
+            let mut result = match String::from_utf16(str_slice) {
+                Ok(result) => result,
+                Err(error) => {
+                    GlobalUnlock(clipboard_data);
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, error));
                 }
+            };
+
+            //It seems WinAPI always supposed to have at the end null char.
+            //But just to be safe let's check for it and only then remove.
+            if let Some(null_idx) = result.find('\0') {
+                result.drain(null_idx..);
             }
 
             GlobalUnlock(clipboard_data);
