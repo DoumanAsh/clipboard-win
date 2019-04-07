@@ -71,6 +71,9 @@
 //! with kind `InvalidData`
 //!
 
+#![warn(missing_docs)]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
+
 use std::io;
 use std::slice;
 use std::mem;

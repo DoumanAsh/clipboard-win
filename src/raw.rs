@@ -16,7 +16,8 @@ use std::cmp;
 use std::os::windows::ffi::OsStrExt;
 use std::os::raw::{
     c_int,
-    c_uint
+    c_uint,
+    c_void,
 };
 use std::ptr;
 use std::io;
@@ -150,6 +151,22 @@ pub fn size(format: u32) -> Option<usize> {
     }
 }
 
+///Retrieves raw pointer to clipboard data.
+///
+///Wrapper around ```GetClipboardData```.
+///
+///# Pre-conditions:
+///
+///* [open()](fn.open.html) has been called.
+pub fn get_clipboard_data(format: c_uint) -> io::Result<ptr::NonNull<c_void>> {
+    let clipboard_data = unsafe { GetClipboardData(format) };
+
+    match ptr::NonNull::new(clipboard_data as *mut c_void) {
+        Some(ptr) => Ok(ptr),
+        None => Err(utils::get_last_error()),
+    }
+}
+
 ///Retrieves data of specified format from clipboard.
 ///
 ///Wrapper around ```GetClipboardData```.
@@ -209,7 +226,7 @@ pub fn get_string() -> io::Result<String> {
     }
     else {
         unsafe {
-            let data_ptr = GlobalLock(clipboard_data) as *const u16;
+            let data_ptr = GlobalLock(clipboard_data) as *const c_void as *const u16;
 
             if data_ptr.is_null() {
                 return Err(utils::get_last_error());
