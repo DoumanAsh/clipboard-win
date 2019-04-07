@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "2.1.2"
+version = "2.2.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "MIT"
@@ -12,6 +12,7 @@ repository = "https://github.com/DoumanAsh/clipboard-win"
 documentation = "https://docs.rs/clipboard-win/*/x86_64-pc-windows-msvc/clipboard_win/"
 
 readme = "README.md"
+edition = "2018"
 
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"

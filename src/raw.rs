@@ -12,7 +12,6 @@
 
 extern crate winapi;
 
-use ::std;
 use std::cmp;
 use std::os::windows::ffi::OsStrExt;
 use std::os::raw::{
@@ -22,14 +21,14 @@ use std::os::raw::{
 use std::ptr;
 use std::io;
 
-use ::utils;
-use ::formats;
+use crate::utils;
+use crate::formats;
 
-use self::winapi::shared::basetsd::{
+use winapi::shared::basetsd::{
     SIZE_T
 };
 
-use self::winapi::um::winbase::{
+use winapi::um::winbase::{
     GlobalSize,
     GlobalLock,
     GlobalUnlock,
@@ -37,7 +36,7 @@ use self::winapi::um::winbase::{
     GlobalFree
 };
 
-use self::winapi::um::winuser::{
+use winapi::um::winuser::{
     OpenClipboard,
     CloseClipboard,
     EmptyClipboard,
