@@ -26,7 +26,7 @@ default-features = false
 features = [
     "basetsd",
     "winbase",
-    "winuser"
+    "winuser",
 ]
 
 [lib]

@@ -2,15 +2,16 @@
 
 use winapi::um::wingdi::GetObjectW;
 
-use std::{io, mem};
-use std::os::raw::{c_void, c_int};
+use std::{slice, io, mem};
+use std::os::raw::{c_void, c_int, c_long};
 
 use crate::utils;
 
 ///Bitmap image from clipboard
 pub struct Bitmap {
     inner: winapi::shared::windef::HBITMAP,
-    data: winapi::um::wingdi::BITMAP,
+    ///Raw BITMAP data
+    pub data: winapi::um::wingdi::BITMAP,
 }
 
 impl Bitmap {
@@ -31,6 +32,20 @@ impl Bitmap {
     }
 
     #[inline]
+    ///Calculates the size in bytes for pixel data
+    pub fn size(&self) -> usize {
+        let color_bits = (self.data.bmPlanes * self.data.bmBitsPixel) as c_long;
+        let result = ((self.data.bmWidth * color_bits + 31) / color_bits) * 4 * self.data.bmHeight;
+        result as usize
+    }
+
+    #[inline]
+    ///Retrieves data of underlying Bitmap's data
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.data.bmBits as *const _, self.size()) }
+    }
+
+    #[inline]
     ///Returns raw handle.
     pub fn as_raw(&self) -> winapi::shared::windef::HBITMAP {
         self.inner
@@ -40,5 +55,12 @@ impl Bitmap {
     ///Returns image dimensions as `(width, height)`
     pub fn dimensions(&self) -> (usize, usize) {
         (self.data.bmWidth as usize, self.data.bmHeight as usize)
+    }
+
+    ///Writes bitmap to IO object
+    ///
+    ///Returns number of written bytes
+    pub fn write<O: io::Write>(&self, _: O) -> io::Result<usize> {
+        unimplemented!()
     }
 }

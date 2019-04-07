@@ -84,8 +84,6 @@ pub mod formats;
 pub mod raw;
 pub mod image;
 
-pub use image::Bitmap;
-
 pub use raw::{
     register_format
 };
@@ -167,8 +165,8 @@ impl Clipboard {
 
     ///Retrieves `Bitmap` of `CF_BITMAP` format from clipboard.
     #[inline]
-    pub fn get_bit_map(&self) -> io::Result<Bitmap> {
-        raw::get_clipboard_data(formats::CF_BITMAP).and_then(|ptr| Bitmap::new(ptr.as_ptr()))
+    pub fn get_bit_map(&self) -> io::Result<image::Bitmap> {
+        raw::get_clipboard_data(formats::CF_BITMAP).and_then(|ptr| image::Bitmap::new(ptr.as_ptr()))
     }
 
 
