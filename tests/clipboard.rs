@@ -40,11 +40,16 @@ fn set_data() {
     assert_eq!(result.unwrap(), 0);
 
     //Check simple set of utf-8 bytes
+    assert!(clipboard.size(format).is_none());
     let seq_num_before = Clipboard::seq_num();
     let result = clipboard.set(format, data);
+
     assert!(result.is_ok());
+
     let seq_num_after = Clipboard::seq_num();
     assert!(seq_num_before != seq_num_after);
+    let size_after = clipboard.size(format).expect("Should have size after set");
+    assert_eq!(size_after, data.len());
 
     //Check simple get of utf-8 bytes
     let result = clipboard.get(format, &mut buff);

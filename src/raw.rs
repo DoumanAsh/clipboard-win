@@ -138,16 +138,49 @@ pub fn seq_num() -> Option<u32> {
 ///# Returns:
 ///
 ///Size in bytes if format presents on clipboard.
+///
+///# Unsafety:
+///
+///In some cases, clipboard content might be so invalid that it crashes on `GlobalSize` (e.g.
+///Bitmap)
+///
+///Due to that function is marked as unsafe
+pub unsafe fn size_unsafe(format: u32) -> Option<usize> {
+    let clipboard_data = GetClipboardData(format);
+
+    match clipboard_data.is_null() {
+        false => Some(GlobalSize(clipboard_data) as usize),
+        true => None,
+    }
+}
+
+#[inline]
+///Retrieves size of clipboard data for specified format.
+///
+///# Pre-conditions:
+///
+///* [open()](fn.open.html) has been called.
+///
+///# Returns:
+///
+///Size in bytes if format presents on clipboard.
 pub fn size(format: u32) -> Option<usize> {
     let clipboard_data = unsafe {GetClipboardData(format)};
 
     if clipboard_data.is_null() {
-        None
+        return None
     }
-    else {
-        unsafe {
-            Some(GlobalSize(clipboard_data) as usize)
+
+    unsafe {
+        if GlobalLock(clipboard_data).is_null() {
+            return None;
         }
+
+        let result = Some(GlobalSize(clipboard_data) as usize);
+
+        GlobalUnlock(clipboard_data);
+
+        result
     }
 }
 
