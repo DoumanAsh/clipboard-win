@@ -169,7 +169,6 @@ impl Clipboard {
         raw::get_clipboard_data(formats::CF_BITMAP).and_then(|ptr| image::Bitmap::new(ptr.as_ptr()))
     }
 
-
     ///Enumerator over all formats on clipboard..
     #[inline]
     pub fn enum_formats(&self) -> raw::EnumFormats {

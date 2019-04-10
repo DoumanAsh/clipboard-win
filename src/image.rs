@@ -1,11 +1,53 @@
 //! Image module
 
-use winapi::um::wingdi::GetObjectW;
+use winapi::um::wingdi::{GetDIBits, GetObjectW};
 
-use std::{slice, io, mem};
-use std::os::raw::{c_void, c_int, c_long};
+use std::{ptr, slice, io, mem};
+use std::os::raw::{c_void, c_int, c_long, c_ulong};
 
 use crate::utils;
+
+struct Dc(winapi::shared::windef::HDC);
+
+impl Dc {
+    fn new() -> Self {
+        Self(unsafe { winapi::um::winuser::GetDC(ptr::null_mut()) })
+    }
+}
+
+impl Drop for Dc {
+    fn drop(&mut self) {
+        unsafe { winapi::um::winuser::ReleaseDC(ptr::null_mut(), self.0) };
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct BmpHeader {
+    typ: u16,
+    size: u32,
+    reserved: u32,
+    offset: u32,
+    info: winapi::um::wingdi::BITMAPINFO,
+}
+
+impl BmpHeader {
+    const fn len() -> usize {
+        mem::size_of::<BmpHeader>() - mem::size_of::<winapi::um::wingdi::RGBQUAD>()
+    }
+}
+
+impl Default for BmpHeader {
+    fn default() -> Self {
+        Self {
+            typ: 0x4D42,
+            size: 0,
+            reserved: 0,
+            offset: 54,
+            info: unsafe { mem::zeroed() }
+        }
+    }
+}
 
 ///Bitmap image from clipboard
 pub struct Bitmap {
@@ -57,10 +99,35 @@ impl Bitmap {
         (self.data.bmWidth as usize, self.data.bmHeight as usize)
     }
 
-    ///Writes bitmap to IO object
+    ///Retrieves image as binary.
     ///
-    ///Returns number of written bytes
-    pub fn write<O: io::Write>(&self, _: O) -> io::Result<usize> {
-        unimplemented!()
+    ///TODO: make it work
+    pub fn data(&self) -> io::Result<Vec<u8>> {
+        use winapi::um::wingdi::{DIB_RGB_COLORS, BITMAPINFOHEADER, BITMAPINFO};
+
+        let dc = Dc::new();
+
+        let mut header = BmpHeader::default();
+
+        header.info.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as c_ulong;
+        let data_ptr = &mut header.info as *mut BITMAPINFO;
+
+        match unsafe { GetDIBits(dc.0, self.inner, 0, 0, ptr::null_mut(), data_ptr, DIB_RGB_COLORS) } {
+            0 => return Err(utils::get_last_error()),
+            _ => (),
+        }
+
+        header.info.bmiHeader.biCompression = winapi::um::wingdi::BI_RGB;
+        header.size = header.info.bmiHeader.biSizeImage as u32 + header.offset;
+
+        let buffer_len = BmpHeader::len() + header.info.bmiHeader.biSizeImage as usize;
+        let mut buffer = Vec::with_capacity(buffer_len);
+        buffer.extend_from_slice(unsafe { slice::from_raw_parts(&header as *const _ as *const u8, BmpHeader::len()) });
+        unsafe { buffer.set_len(buffer_len) };
+
+        match unsafe { GetDIBits(dc.0, self.inner, 0, 0, buffer.get_unchecked_mut(mem::size_of::<BmpHeader>()) as *mut u8 as *mut _, data_ptr, DIB_RGB_COLORS) } {
+            0 => Err(utils::get_last_error()),
+            _ => Ok(buffer),
+        }
     }
 }
