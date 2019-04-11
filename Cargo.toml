@@ -24,6 +24,7 @@ appveyor = { repository = "DoumanAsh/clipboard-win"}
 version = "0.3"
 default-features = false
 features = [
+    "std",
     "basetsd",
     "winbase",
     "winuser",

@@ -62,9 +62,9 @@ impl Bitmap {
         use winapi::um::wingdi::BITMAP;
 
         let mut data: BITMAP = unsafe { mem::zeroed() };
-        let data_ptr = &mut data as *mut BITMAP as *mut winapi::ctypes::c_void;
+        let data_ptr = &mut data as *mut BITMAP as *mut c_void;
 
-        match unsafe { GetObjectW(ptr as *mut winapi::ctypes::c_void, mem::size_of::<BITMAP>() as c_int, data_ptr) } {
+        match unsafe { GetObjectW(ptr as *mut c_void, mem::size_of::<BITMAP>() as c_int, data_ptr) } {
             0 => Err(utils::get_last_error()),
             _ => Ok(Self {
                 inner: ptr as winapi::shared::windef::HBITMAP,
