@@ -26,6 +26,7 @@ default-features = false
 features = [
     "std",
     "basetsd",
+    "shellapi",
     "winbase",
     "winuser",
 ]

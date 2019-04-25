@@ -78,6 +78,7 @@ use std::io;
 use std::slice;
 use std::mem;
 use std::os::windows::ffi::OsStrExt;
+use std::path::PathBuf;
 
 mod utils;
 pub mod formats;
@@ -161,6 +162,14 @@ impl Clipboard {
     #[inline]
     pub fn get_string(&self) -> io::Result<String> {
         raw::get_string()
+    }
+
+    /// Retrieves a list of file paths from the `CF_HDROP` format from the clipboard.
+    ///
+    /// Wraps `raw::get_file_list()`
+    #[inline]
+    pub fn get_file_list(&self) -> io::Result<Vec<PathBuf>> {
+        raw::get_file_list()
     }
 
     ///Retrieves `Bitmap` of `CF_BITMAP` format from clipboard.

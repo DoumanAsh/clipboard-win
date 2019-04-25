@@ -13,20 +13,31 @@
 extern crate winapi;
 
 use std::cmp;
-use std::os::windows::ffi::OsStrExt;
+use std::ffi::OsString;
+use std::os::windows::ffi::{
+    OsStrExt,
+    OsStringExt
+};
 use std::os::raw::{
     c_int,
     c_uint,
     c_void,
 };
+use std::path::PathBuf;
 use std::ptr;
 use std::io;
 
 use crate::utils;
+use crate::utils::WinNullCheckable;
 use crate::formats;
 
 use winapi::shared::basetsd::{
     SIZE_T
+};
+
+use winapi::um::shellapi::{
+    DragQueryFileW,
+    HDROP
 };
 
 use winapi::um::winbase::{
@@ -289,6 +300,47 @@ pub fn get_string() -> io::Result<String> {
 
             Ok(result)
         }
+    }
+}
+
+/// Retrieves a list of file paths from the `CF_HDROP` format.
+///
+/// # Pre-conditions:
+///
+/// * [open()](fn.open.html) has been called.
+pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
+    unsafe {
+        let clipboard_data = GetClipboardData(formats::CF_HDROP).if_null_get_last_error()?;
+        let _data_ptr = GlobalLock(clipboard_data).if_null_get_last_error()?;
+        let gen_err_unlock = || -> io::Error {
+            GlobalUnlock(clipboard_data);
+            io::ErrorKind::Other.into()
+        };
+        let num_files = DragQueryFileW(clipboard_data as HDROP, std::u32::MAX, ptr::null_mut(), 0);
+        let file_names: io::Result<Vec<PathBuf>> = (0..num_files)
+            .into_iter()
+            .map(|file_index| {
+                let required_size =
+                    1 + DragQueryFileW(clipboard_data as HDROP, file_index, ptr::null_mut(), 0)
+                        .if_null_to_error(gen_err_unlock)?;
+                let file_str_buf = {
+                    let mut buffer = Vec::with_capacity(required_size as usize);
+                    DragQueryFileW(
+                        clipboard_data as HDROP,
+                        file_index,
+                        buffer.as_mut_ptr(),
+                        required_size,
+                    ).if_null_to_error(gen_err_unlock)?;
+                    // Set length, remove terminating zero
+                    buffer.set_len(required_size as usize - 1);
+                    buffer
+                };
+                let os_string = OsString::from_wide(&file_str_buf);
+                Ok(PathBuf::from(os_string))
+            })
+            .collect();
+        GlobalUnlock(clipboard_data);
+        file_names
     }
 }
 
