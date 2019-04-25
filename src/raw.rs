@@ -28,12 +28,13 @@ use std::ptr;
 use std::io;
 
 use crate::utils;
-use crate::utils::WinNullCheckable;
 use crate::formats;
 
 use winapi::shared::basetsd::{
     SIZE_T
 };
+
+use winapi::shared::ntdef::HANDLE;
 
 use winapi::um::shellapi::{
     DragQueryFileW,
@@ -310,37 +311,46 @@ pub fn get_string() -> io::Result<String> {
 /// * [open()](fn.open.html) has been called.
 pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
     unsafe {
-        let clipboard_data = GetClipboardData(formats::CF_HDROP).if_null_get_last_error()?;
-        let _data_ptr = GlobalLock(clipboard_data).if_null_get_last_error()?;
-        let gen_err_unlock = || -> io::Error {
-            GlobalUnlock(clipboard_data);
-            io::ErrorKind::Other.into()
+        let clipboard_data = GetClipboardData(formats::CF_HDROP);
+        if clipboard_data.is_null() {
+            return Err(utils::get_last_error());
+        }
+
+        let _locked_data = {
+            let locked_ptr = GlobalLock(clipboard_data);
+            if locked_ptr.is_null() {
+                return Err(utils::get_last_error());
+            }
+            LockedData(clipboard_data)
         };
+
         let num_files = DragQueryFileW(clipboard_data as HDROP, std::u32::MAX, ptr::null_mut(), 0);
-        let file_names: io::Result<Vec<PathBuf>> = (0..num_files)
-            .into_iter()
-            .map(|file_index| {
-                let required_size =
-                    1 + DragQueryFileW(clipboard_data as HDROP, file_index, ptr::null_mut(), 0)
-                        .if_null_to_error(gen_err_unlock)?;
-                let file_str_buf = {
-                    let mut buffer = Vec::with_capacity(required_size as usize);
-                    DragQueryFileW(
-                        clipboard_data as HDROP,
-                        file_index,
-                        buffer.as_mut_ptr(),
-                        required_size,
-                    ).if_null_to_error(gen_err_unlock)?;
-                    // Set length, remove terminating zero
-                    buffer.set_len(required_size as usize - 1);
-                    buffer
-                };
-                let os_string = OsString::from_wide(&file_str_buf);
-                Ok(PathBuf::from(os_string))
-            })
-            .collect();
-        GlobalUnlock(clipboard_data);
-        file_names
+        let mut file_names = Vec::with_capacity(num_files as usize);
+
+        for file_index in 0..num_files {
+            let required_size_no_null = DragQueryFileW(clipboard_data as HDROP, file_index, ptr::null_mut(), 0);
+            if required_size_no_null == 0 {
+                return Err(io::ErrorKind::Other.into());
+            }
+            let required_size = required_size_no_null + 1;
+            let mut file_str_buf = Vec::with_capacity(required_size as usize);
+
+            let write_retval = DragQueryFileW(
+                clipboard_data as HDROP,
+                file_index,
+                file_str_buf.as_mut_ptr(),
+                required_size,
+            );
+            if write_retval == 0 {
+                return Err(io::ErrorKind::Other.into());
+            }
+
+            // Set length, remove terminating zero
+            file_str_buf.set_len(required_size_no_null as usize);
+            file_names.push(PathBuf::from(OsString::from_wide(&file_str_buf)));
+        }
+
+        Ok(file_names)
     }
 }
 
@@ -402,6 +412,16 @@ pub fn count_formats() -> io::Result<i32> {
     }
 
     Ok(result)
+}
+
+struct LockedData(HANDLE);
+
+impl Drop for LockedData {
+    fn drop(&mut self) {
+        unsafe {
+            GlobalUnlock(self.0);
+        }
+    }
 }
 
 ///Enumerator over available clipboard formats.
