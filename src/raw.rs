@@ -13,12 +13,17 @@
 extern crate winapi;
 
 use std::cmp;
-use std::os::windows::ffi::OsStrExt;
+use std::ffi::OsString;
+use std::os::windows::ffi::{
+    OsStrExt,
+    OsStringExt
+};
 use std::os::raw::{
     c_int,
     c_uint,
     c_void,
 };
+use std::path::PathBuf;
 use std::ptr;
 use std::io;
 
@@ -27,6 +32,13 @@ use crate::formats;
 
 use winapi::shared::basetsd::{
     SIZE_T
+};
+
+use winapi::shared::ntdef::HANDLE;
+
+use winapi::um::shellapi::{
+    DragQueryFileW,
+    HDROP
 };
 
 use winapi::um::winbase::{
@@ -292,6 +304,58 @@ pub fn get_string() -> io::Result<String> {
     }
 }
 
+/// Retrieves a list of file paths from the `CF_HDROP` format.
+///
+/// # Pre-conditions:
+///
+/// * [open()](fn.open.html) has been called.
+pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
+    unsafe {
+        let clipboard_data = GetClipboardData(formats::CF_HDROP);
+        if clipboard_data.is_null() {
+            return Err(utils::get_last_error());
+        }
+
+        let _locked_data = {
+            let locked_ptr = GlobalLock(clipboard_data);
+            if locked_ptr.is_null() {
+                return Err(utils::get_last_error());
+            }
+            LockedData(clipboard_data)
+        };
+
+        let num_files = DragQueryFileW(clipboard_data as HDROP, std::u32::MAX, ptr::null_mut(), 0);
+
+        let mut file_names = Vec::with_capacity(num_files as usize);
+
+        for file_index in 0..num_files {
+            let required_size_no_null = DragQueryFileW(clipboard_data as HDROP, file_index, ptr::null_mut(), 0);
+            if required_size_no_null == 0 {
+                return Err(io::ErrorKind::Other.into());
+            }
+            let required_size = required_size_no_null + 1;
+            let mut file_str_buf = Vec::with_capacity(required_size as usize);
+
+            let write_retval = DragQueryFileW(
+                clipboard_data as HDROP,
+                file_index,
+                file_str_buf.as_mut_ptr(),
+                required_size,
+            );
+            if write_retval == 0 {
+                return Err(io::ErrorKind::Other.into());
+            }
+
+            file_str_buf.set_len(required_size as usize);
+            // Remove terminating zero
+            let os_string = OsString::from_wide(&file_str_buf[..required_size_no_null as usize]);
+            file_names.push(PathBuf::from(os_string));
+        }
+
+        Ok(file_names)
+    }
+}
+
 ///Sets data onto clipboard with specified format.
 ///
 ///Wrapper around ```SetClipboardData```.
@@ -350,6 +414,16 @@ pub fn count_formats() -> io::Result<i32> {
     }
 
     Ok(result)
+}
+
+struct LockedData(HANDLE);
+
+impl Drop for LockedData {
+    fn drop(&mut self) {
+        unsafe {
+            GlobalUnlock(self.0);
+        }
+    }
 }
 
 ///Enumerator over available clipboard formats.
