@@ -325,6 +325,7 @@ pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
         };
 
         let num_files = DragQueryFileW(clipboard_data as HDROP, std::u32::MAX, ptr::null_mut(), 0);
+
         let mut file_names = Vec::with_capacity(num_files as usize);
 
         for file_index in 0..num_files {
@@ -345,9 +346,10 @@ pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
                 return Err(io::ErrorKind::Other.into());
             }
 
-            // Set length, remove terminating zero
-            file_str_buf.set_len(required_size_no_null as usize);
-            file_names.push(PathBuf::from(OsString::from_wide(&file_str_buf)));
+            file_str_buf.set_len(required_size as usize);
+            // Remove terminating zero
+            let os_string = OsString::from_wide(&file_str_buf[..required_size_no_null as usize]);
+            file_names.push(PathBuf::from(os_string));
         }
 
         Ok(file_names)
