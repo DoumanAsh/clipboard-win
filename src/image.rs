@@ -99,6 +99,7 @@ impl Bitmap {
         (self.data.bmWidth as usize, self.data.bmHeight as usize)
     }
 
+    #[doc(hidden)]
     ///Retrieves image as binary.
     ///
     ///TODO: make it work
