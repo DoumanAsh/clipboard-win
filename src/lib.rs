@@ -109,17 +109,16 @@ impl Clipboard {
 
     #[inline]
     ///Attempts to initialize clipboard `num` times before giving up.
-    pub fn new_attempts(mut num: usize) -> Option<Clipboard> {
-        while num > 0 {
+    pub fn new_attempts(mut num: usize) -> io::Result<Clipboard> {
+        loop {
             match raw::open() {
-                Ok(_) => return Some(Clipboard { inner: () }),
-                Err(_) => (),
+                Ok(_) => break Ok(Clipboard { inner: () }),
+                Err(error) => match num {
+                    0 => break Err(error),
+                    _ => num -= 1
+                },
             }
-
-            num -= 1
         }
-
-        None
     }
 
     ///Empties clipboard.

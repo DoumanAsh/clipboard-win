@@ -62,12 +62,8 @@ fn main() {
     let text = "For my waifu!";
     Clipboard::new().unwrap().set_string(text);
 
-    let result = Clipboard::new().unwrap().get_string().unwrap();
+    let mut result = String::new();
+    Clipboard::new().unwrap().get_string(&mut result).unwrap();
     assert_eq!(text, result);
 }
 ```
-
-# Feature list
-
-* `utf16error` - Uses non-lossy conversion from UTF-16 to UTF-8. On error returns `io::error`
-with kind `InvalidData`
