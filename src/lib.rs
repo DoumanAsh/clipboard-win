@@ -74,20 +74,14 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 
-use std::io;
-use std::slice;
-use std::mem;
-use std::os::windows::ffi::OsStrExt;
-use std::path::PathBuf;
-
-mod utils;
 pub mod formats;
 pub mod raw;
-pub mod image;
+pub mod utils;
 
-pub use raw::{
-    register_format
-};
+use std::{mem, slice, io};
+use std::path::PathBuf;
+
+use std::os::windows::ffi::OsStrExt;
 
 ///Clipboard accessor.
 ///
@@ -111,7 +105,22 @@ impl Clipboard {
     ///Attempts to open clipboard.
     #[inline]
     pub fn new() -> io::Result<Clipboard> {
-        raw::open().map(|_| Clipboard {inner: ()})
+        raw::open().map(|_| Clipboard { inner: () })
+    }
+
+    #[inline]
+    ///Attempts to initialize clipboard `num` times before giving up.
+    pub fn new_attempts(mut num: usize) -> Option<Clipboard> {
+        while num > 0 {
+            match raw::open() {
+                Ok(_) => return Some(Clipboard { inner: () }),
+                Err(_) => (),
+            }
+
+            num -= 1
+        }
+
+        None
     }
 
     ///Empties clipboard.
@@ -174,9 +183,9 @@ impl Clipboard {
 
     ///Retrieves `Bitmap` of `CF_BITMAP` format from clipboard.
     #[inline]
-    pub fn get_bit_map(&self) -> io::Result<image::Bitmap> {
-        raw::get_clipboard_data(formats::CF_BITMAP).and_then(|ptr| image::Bitmap::new(ptr.as_ptr()))
-    }
+    //pub fn get_bit_map(&self) -> io::Result<image::Bitmap> {
+    //    raw::get_clipboard_data(formats::CF_BITMAP).and_then(|ptr| image::Bitmap::new(ptr.as_ptr()))
+    //}
 
     ///Enumerator over all formats on clipboard..
     #[inline]

@@ -10,9 +10,7 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-extern crate winapi;
-
-use std::cmp;
+use core::{ptr, cmp};
 use std::ffi::OsString;
 use std::os::windows::ffi::{
     OsStrExt,
@@ -24,17 +22,14 @@ use std::os::raw::{
     c_void,
 };
 use std::path::PathBuf;
-use std::ptr;
 use std::io;
 
-use crate::utils;
 use crate::formats;
+use crate::utils::LockedData;
 
 use winapi::shared::basetsd::{
     SIZE_T
 };
-
-use winapi::shared::ntdef::HANDLE;
 
 use winapi::um::shellapi::{
     DragQueryFileW,
@@ -78,7 +73,7 @@ use winapi::um::winuser::{
 pub fn open() -> io::Result<()> {
     unsafe {
         if OpenClipboard(ptr::null_mut()) == 0 {
-            return Err(utils::get_last_error());
+            return Err(io::Error::last_os_error());
         }
     }
 
@@ -96,7 +91,7 @@ pub fn open() -> io::Result<()> {
 pub fn close() -> io::Result<()> {
     unsafe {
         if CloseClipboard() == 0 {
-            return Err(utils::get_last_error());
+            return Err(io::Error::last_os_error());
         }
     }
 
@@ -114,7 +109,7 @@ pub fn close() -> io::Result<()> {
 pub fn empty() -> io::Result<()> {
     unsafe {
         if EmptyClipboard() == 0 {
-            return Err(utils::get_last_error());
+            return Err(io::Error::last_os_error());
         }
     }
 
@@ -196,6 +191,7 @@ pub fn size(format: u32) -> Option<usize> {
     }
 }
 
+#[inline]
 ///Retrieves raw pointer to clipboard data.
 ///
 ///Wrapper around ```GetClipboardData```.
@@ -208,7 +204,7 @@ pub fn get_clipboard_data(format: c_uint) -> io::Result<ptr::NonNull<c_void>> {
 
     match ptr::NonNull::new(clipboard_data as *mut c_void) {
         Some(ptr) => Ok(ptr),
-        None => Err(utils::get_last_error()),
+        None => Err(io::Error::last_os_error()),
     }
 }
 
@@ -228,26 +224,16 @@ pub fn get_clipboard_data(format: c_uint) -> io::Result<ptr::NonNull<c_void>> {
 ///
 ///Number of copied bytes.
 pub fn get(format: u32, result: &mut [u8]) -> io::Result<usize> {
-    let clipboard_data = unsafe { GetClipboardData(format as c_uint) };
+    let clipboard_data = get_clipboard_data(format as c_uint)?;
 
-    if clipboard_data.is_null() {
-        Err(utils::get_last_error())
-    }
-    else {
-        unsafe {
-            let data_ptr = GlobalLock(clipboard_data) as *const u8;
+    unsafe {
+        let (data_ptr, _guard) = LockedData::new(clipboard_data.as_ptr())?;
 
-            if data_ptr.is_null() {
-                return Err(utils::get_last_error());
-            }
+        let data_size = cmp::min(GlobalSize(clipboard_data.as_ptr()) as usize, result.len());
 
-            let data_size = cmp::min(GlobalSize(clipboard_data) as usize, result.len());
+        ptr::copy_nonoverlapping(data_ptr.as_ptr(), result.as_mut_ptr(), data_size);
 
-            ptr::copy_nonoverlapping(data_ptr, result.as_mut_ptr(), data_size);
-            GlobalUnlock(clipboard_data);
-
-            Ok(data_size)
-        }
+        Ok(data_size)
     }
 }
 
@@ -264,43 +250,31 @@ pub fn get(format: u32, result: &mut [u8]) -> io::Result<usize> {
 ///
 ///* [open()](fn.open.html) has been called.
 pub fn get_string() -> io::Result<String> {
-    let clipboard_data = unsafe { GetClipboardData(formats::CF_UNICODETEXT) };
+    let clipboard_data = get_clipboard_data(formats::CF_UNICODETEXT)?;
 
-    if clipboard_data.is_null() {
-        Err(utils::get_last_error())
-    }
-    else {
-        unsafe {
-            let data_ptr = GlobalLock(clipboard_data) as *const c_void as *const u16;
+    unsafe {
+        let (data_ptr, _guard) = LockedData::new(clipboard_data.as_ptr())?;
 
-            if data_ptr.is_null() {
-                return Err(utils::get_last_error());
+        let data_size = GlobalSize(clipboard_data.as_ptr()) as usize / std::mem::size_of::<u16>();
+
+        let str_slice = std::slice::from_raw_parts(data_ptr.as_ptr(), data_size);
+        #[cfg(not(feature = "utf16error"))]
+        let mut result = String::from_utf16_lossy(str_slice);
+        #[cfg(feature = "utf16error")]
+        let mut result = match String::from_utf16(str_slice) {
+            Ok(result) => result,
+            Err(error) => {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, error));
             }
+        };
 
-            let data_size = GlobalSize(clipboard_data) as usize / std::mem::size_of::<u16>();
-
-            let str_slice = std::slice::from_raw_parts(data_ptr, data_size);
-            #[cfg(not(feature = "utf16error"))]
-            let mut result = String::from_utf16_lossy(str_slice);
-            #[cfg(feature = "utf16error")]
-            let mut result = match String::from_utf16(str_slice) {
-                Ok(result) => result,
-                Err(error) => {
-                    GlobalUnlock(clipboard_data);
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, error));
-                }
-            };
-
-            //It seems WinAPI always supposed to have at the end null char.
-            //But just to be safe let's check for it and only then remove.
-            if let Some(null_idx) = result.find('\0') {
-                result.drain(null_idx..);
-            }
-
-            GlobalUnlock(clipboard_data);
-
-            Ok(result)
+        //It seems WinAPI always supposed to have at the end null char.
+        //But just to be safe let's check for it and only then remove.
+        if let Some(null_idx) = result.find('\0') {
+            result.drain(null_idx..);
         }
+
+        Ok(result)
     }
 }
 
@@ -310,19 +284,11 @@ pub fn get_string() -> io::Result<String> {
 ///
 /// * [open()](fn.open.html) has been called.
 pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
-    unsafe {
-        let clipboard_data = GetClipboardData(formats::CF_HDROP);
-        if clipboard_data.is_null() {
-            return Err(utils::get_last_error());
-        }
+    let clipboard_data = get_clipboard_data(formats::CF_UNICODETEXT)?;
+    let clipboard_data = clipboard_data.as_ptr();
 
-        let _locked_data = {
-            let locked_ptr = GlobalLock(clipboard_data);
-            if locked_ptr.is_null() {
-                return Err(utils::get_last_error());
-            }
-            LockedData(clipboard_data)
-        };
+    unsafe {
+        let (_, _locked_data) = LockedData::new::<c_void>(clipboard_data)?;
 
         let num_files = DragQueryFileW(clipboard_data as HDROP, std::u32::MAX, ptr::null_mut(), 0);
 
@@ -333,16 +299,11 @@ pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
             if required_size_no_null == 0 {
                 return Err(io::ErrorKind::Other.into());
             }
+
             let required_size = required_size_no_null + 1;
             let mut file_str_buf = Vec::with_capacity(required_size as usize);
 
-            let write_retval = DragQueryFileW(
-                clipboard_data as HDROP,
-                file_index,
-                file_str_buf.as_mut_ptr(),
-                required_size,
-            );
-            if write_retval == 0 {
+            if DragQueryFileW(clipboard_data as HDROP, file_index, file_str_buf.as_mut_ptr(), required_size) == 0 {
                 return Err(io::ErrorKind::Other.into());
             }
 
@@ -370,18 +331,18 @@ pub fn set(format: u32, data: &[u8]) -> io::Result<()> {
     let alloc_handle = unsafe { GlobalAlloc(GHND, size as SIZE_T) };
 
     if alloc_handle.is_null() {
-        Err(utils::get_last_error())
+        Err(io::Error::last_os_error())
     }
     else {
         unsafe {
-            let lock = GlobalLock(alloc_handle) as *mut u8;
-
-            ptr::copy_nonoverlapping(data.as_ptr(), lock, size);
-            GlobalUnlock(alloc_handle);
+            {
+                let (ptr, _lock) = LockedData::new(alloc_handle)?;
+                ptr::copy_nonoverlapping(data.as_ptr(), ptr.as_ptr(), size);
+            }
             EmptyClipboard();
 
             if SetClipboardData(format, alloc_handle).is_null() {
-                let result = utils::get_last_error();
+                let result = io::Error::last_os_error();
                 GlobalFree(alloc_handle);
                 Err(result)
             }
@@ -404,7 +365,7 @@ pub fn count_formats() -> io::Result<i32> {
     let result = unsafe { CountClipboardFormats() };
 
     if result == 0 {
-        let error = utils::get_last_error();
+        let error = io::Error::last_os_error();
 
         if let Some(raw_error) = error.raw_os_error() {
             if raw_error != 0 {
@@ -414,16 +375,6 @@ pub fn count_formats() -> io::Result<i32> {
     }
 
     Ok(result)
-}
-
-struct LockedData(HANDLE);
-
-impl Drop for LockedData {
-    fn drop(&mut self) {
-        unsafe {
-            GlobalUnlock(self.0);
-        }
-    }
 }
 
 ///Enumerator over available clipboard formats.
@@ -492,8 +443,7 @@ macro_rules! match_format_name {
 
                     if GetClipboardFormatNameW($name, buff_p, format_buff.len() as c_int) == 0 {
                         None
-                    }
-                    else {
+                    } else {
                         Some(String::from_utf16_lossy(&format_buff))
                     }
                 }
@@ -551,12 +501,8 @@ pub fn register_format<T: ?Sized + AsRef<std::ffi::OsStr>>(name: &T) -> io::Resu
     let mut utf16_buff: Vec<u16> = name.as_ref().encode_wide().collect();
     utf16_buff.push(0);
 
-    let result = unsafe { RegisterClipboardFormatW(utf16_buff.as_ptr()) };
-
-    if result == 0 {
-        Err(utils::get_last_error())
-    }
-    else {
-        Ok(result)
+    match unsafe { RegisterClipboardFormatW(utf16_buff.as_ptr()) } {
+        0 => Err(io::Error::last_os_error()),
+        result => Ok(result),
     }
 }
