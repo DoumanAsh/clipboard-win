@@ -67,3 +67,21 @@ fn main() {
     assert_eq!(text, result);
 }
 ```
+
+## Set and get String shortcuts
+
+```rust
+extern crate clipboard_win;
+use clipboard_win::{set_clipboard_string, get_clipboard_string};
+
+use std::str;
+
+fn main() {
+    let text = "For my waifu!";
+    set_clipboard_string(text).expect("Success");
+
+    let result = get_clipboard_string().unwrap();
+    assert_eq!(text, result);
+}
+```
+

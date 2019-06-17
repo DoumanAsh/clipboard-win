@@ -50,27 +50,38 @@
 //!
 //!## Set and get String
 //!
-//! ```rust
-//! extern crate clipboard_win;
-//! use clipboard_win::Clipboard;
+//!```rust
+//!extern crate clipboard_win;
+//!use clipboard_win::Clipboard;
 //!
-//! use std::str;
+//!use std::str;
 //!
-//! fn main() {
-//!     let text = "For my waifu!";
-//!     Clipboard::new().unwrap().set_string(text);
+//!fn main() {
+//!    let text = "For my waifu!";
+//!    Clipboard::new().unwrap().set_string(text);
 //!
-//!     let mut result = String::new();
-//!     Clipboard::new().unwrap().get_string(&mut result).unwrap();
-//!     assert_eq!(text, result);
-//! }
-//! ```
+//!    let mut result = String::new();
+//!    Clipboard::new().unwrap().get_string(&mut result).unwrap();
+//!    assert_eq!(text, result);
+//!}
+//!```
 //!
-//! # Feature list
+//!## Set and get String shortcuts
 //!
-//! * `utf16error` - Uses non-lossy conversion from UTF-16 to UTF-8. On error returns `io::error`
-//! with kind `InvalidData`
+//!```rust
+//!extern crate clipboard_win;
+//!use clipboard_win::{set_clipboard_string, get_clipboard_string};
 //!
+//!use std::str;
+//!
+//!fn main() {
+//!    let text = "For my waifu!";
+//!    set_clipboard_string(text).expect("Success");
+//!
+//!    let result = get_clipboard_string().unwrap();
+//!    assert_eq!(text, result);
+//!}
+//!```
 
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
