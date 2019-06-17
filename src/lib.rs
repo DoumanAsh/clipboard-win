@@ -78,10 +78,8 @@ pub mod formats;
 pub mod raw;
 pub mod utils;
 
-use std::{mem, slice, io};
+use std::{io};
 use std::path::PathBuf;
-
-use std::os::windows::ffi::OsStrExt;
 
 ///Clipboard accessor.
 ///
@@ -147,14 +145,8 @@ impl Clipboard {
     ///
     ///Under hood it transforms Rust `UTF-8` String into `UTF-16`
     #[inline]
-    pub fn set_string<T: ?Sized + AsRef<std::ffi::OsStr>>(&self, data: &T) -> io::Result<()> {
-        let data = data.as_ref();
-        let mut utf16_buff = data.encode_wide().collect::<Vec<u16>>();
-        utf16_buff.push(0);
-
-        let data = unsafe { slice::from_raw_parts(utf16_buff.as_ptr() as *const u8,
-                                                  utf16_buff.len() * mem::size_of::<u16>()) };
-        raw::set(formats::CF_UNICODETEXT, data)
+    pub fn set_string(&self, text: &str) -> io::Result<()> {
+        raw::set_string(text)
     }
 
     ///Retrieves data of specified format from clipboard.
@@ -231,6 +223,6 @@ pub fn get_clipboard_string() -> io::Result<String> {
 ///
 ///It opens clipboard and attempts to set string.
 #[inline]
-pub fn set_clipboard_string<T: ?Sized + AsRef<std::ffi::OsStr>>(data: &T) -> io::Result<()> {
+pub fn set_clipboard_string(data: &str) -> io::Result<()> {
     Clipboard::new()?.set_string(data)
 }

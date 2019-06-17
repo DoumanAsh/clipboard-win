@@ -10,7 +10,7 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-use core::{ptr, cmp};
+use core::{mem, ptr, cmp};
 use std::ffi::OsString;
 use std::os::windows::ffi::{
     OsStrExt,
@@ -57,6 +57,8 @@ use winapi::um::winuser::{
     GetClipboardData,
     SetClipboardData
 };
+
+const GHND: c_uint = 0x42;
 
 #[inline]
 ///Opens clipboard.
@@ -324,8 +326,13 @@ pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
 ///# Pre-conditions:
 ///
 ///* [open()](fn.open.html) has been called.
+///
+///# Panic
+///
+///On zero input. If you want to empty clipboard then use [empty()](fn.empty.html).
 pub fn set(format: u32, data: &[u8]) -> io::Result<()> {
-    const GHND: c_uint = 0x42;
+    debug_assert!(data.len() > 0);
+
     let size = data.len();
 
     let alloc_handle = unsafe { GlobalAlloc(GHND, size as SIZE_T) };
@@ -342,6 +349,57 @@ pub fn set(format: u32, data: &[u8]) -> io::Result<()> {
             EmptyClipboard();
 
             if SetClipboardData(format, alloc_handle).is_null() {
+                let result = io::Error::last_os_error();
+                GlobalFree(alloc_handle);
+                Err(result)
+            }
+            else {
+                Ok(())
+            }
+        }
+    }
+}
+
+///Sets data onto clipboard with specified format.
+///
+///Wrapper around ```SetClipboardData```.
+///
+///# Pre-conditions:
+///
+///* [open()](fn.open.html) has been called.
+///
+///# Panic
+///
+///On zero input. If you want to empty clipboard then use [empty()](fn.empty.html).
+pub fn set_string(data: &str) -> io::Result<()> {
+    use winapi::um::stringapiset::MultiByteToWideChar;
+    use winapi::um::winnls::CP_UTF8;
+
+    debug_assert!(data.len() > 0);
+
+    let size = unsafe {
+        MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as c_int, ptr::null_mut(), 0)
+    };
+
+    if size == 0 {
+        return Err(io::Error::last_os_error())
+    }
+
+    let alloc_handle = unsafe { GlobalAlloc(GHND, mem::size_of::<u16>() * (size as SIZE_T + 1)) };
+
+    if alloc_handle.is_null() {
+        Err(io::Error::last_os_error())
+    }
+    else {
+        unsafe {
+            {
+                let (ptr, _lock) = LockedData::new(alloc_handle)?;
+                MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as c_int, ptr.as_ptr(), size);
+                ptr::write(ptr.as_ptr().offset(size as isize), 0);
+            }
+            EmptyClipboard();
+
+            if SetClipboardData(formats::CF_UNICODETEXT, alloc_handle).is_null() {
                 let result = io::Error::last_os_error();
                 GlobalFree(alloc_handle);
                 Err(result)
