@@ -24,6 +24,7 @@ fn set_data() {
     let text = "For my waifu!\0"; //For text we need to pass C-like string
     let wide_text = "メヒーシャ";
     let data = text.as_bytes();
+    let mut result_storage = String::new();
     let mut buff = [0u8; 52];
     let mut small_buff = [0u8; 4];
 
@@ -75,11 +76,11 @@ fn set_data() {
     let seq_num_after = Clipboard::seq_num();
     assert!(seq_num_before != seq_num_after);
     //Check get of wide utf-8 bytes
-    let result = clipboard.get_string();
+    let result = clipboard.get_string(&mut result_storage);
     assert!(result.is_ok());
-    let result = result.unwrap();
-    assert_eq!(result.len(), wide_text.len());
-    assert_eq!(result, wide_text);
+    assert_eq!(result_storage.len(), wide_text.len());
+    assert_eq!(result_storage, wide_text);
+    result_storage.truncate(0);
 
     //Try to copy & paste some url
     let url = "https://duckduckgo.com/html ";
@@ -90,11 +91,11 @@ fn set_data() {
     let seq_num_after = Clipboard::seq_num();
     assert!(seq_num_before != seq_num_after);
 
-    let result = clipboard.get_string();
+    let result = clipboard.get_string(&mut result_storage);
     assert!(result.is_ok());
-    let result = result.unwrap();
-    assert_eq!(result.len(), url.len());
-    assert_eq!(result, url);
+    assert_eq!(result_storage.len(), url.len());
+    assert_eq!(result_storage, url);
+    result_storage.truncate(0);
 
     //Shortcuts
     //Check set of wide utf-8 bytes

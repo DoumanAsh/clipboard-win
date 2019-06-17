@@ -36,7 +36,3 @@ features = [
 name = "clipboard_win"
 path = "src/lib.rs"
 test = false
-
-[features]
-# Do not use lossy UTF-16 to UTF-8 conversion
-utf16error = []

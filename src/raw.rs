@@ -251,32 +251,36 @@ pub fn get(format: u32, result: &mut [u8]) -> io::Result<usize> {
 ///# Pre-conditions:
 ///
 ///* [open()](fn.open.html) has been called.
-pub fn get_string() -> io::Result<String> {
+pub fn get_string(storage: &mut String) -> io::Result<()> {
+    use winapi::um::stringapiset::WideCharToMultiByte;
+    use winapi::um::winnls::CP_UTF8;
+
     let clipboard_data = get_clipboard_data(formats::CF_UNICODETEXT)?;
 
     unsafe {
         let (data_ptr, _guard) = LockedData::new(clipboard_data.as_ptr())?;
 
         let data_size = GlobalSize(clipboard_data.as_ptr()) as usize / std::mem::size_of::<u16>();
+        let storage_req_size = WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr(), data_size as c_int, ptr::null_mut(), 0, ptr::null(), ptr::null_mut());
+        if storage_req_size == 0 {
+            return Err(io::Error::last_os_error());
+        }
 
-        let str_slice = std::slice::from_raw_parts(data_ptr.as_ptr(), data_size);
-        #[cfg(not(feature = "utf16error"))]
-        let mut result = String::from_utf16_lossy(str_slice);
-        #[cfg(feature = "utf16error")]
-        let mut result = match String::from_utf16(str_slice) {
-            Ok(result) => result,
-            Err(error) => {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, error));
-            }
-        };
+        {
+            storage.reserve(storage_req_size as usize);
+            let storage = storage.as_mut_vec();
+            let storage_ptr = storage.as_mut_ptr().offset(storage.len() as isize) as *mut _;
+            WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr(), data_size as c_int, storage_ptr, storage_req_size, ptr::null(), ptr::null_mut());
+            storage.set_len(storage_req_size as usize);
+        }
 
         //It seems WinAPI always supposed to have at the end null char.
         //But just to be safe let's check for it and only then remove.
-        if let Some(null_idx) = result.find('\0') {
-            result.drain(null_idx..);
+        if let Some(null_idx) = storage.find('\0') {
+            storage.drain(null_idx..);
         }
 
-        Ok(result)
+        Ok(())
     }
 }
 

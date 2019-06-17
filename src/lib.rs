@@ -60,7 +60,8 @@
 //!     let text = "For my waifu!";
 //!     Clipboard::new().unwrap().set_string(text);
 //!
-//!     let result = Clipboard::new().unwrap().get_string().unwrap();
+//!     let mut result = String::new();
+//!     Clipboard::new().unwrap().get_string(&mut result).unwrap();
 //!     assert_eq!(text, result);
 //! }
 //! ```
@@ -161,8 +162,8 @@ impl Clipboard {
     ///
     ///Wraps `raw::get_string()`
     #[inline]
-    pub fn get_string(&self) -> io::Result<String> {
-        raw::get_string()
+    pub fn get_string(&self, storage: &mut String) -> io::Result<()> {
+        raw::get_string(storage)
     }
 
     /// Retrieves a list of file paths from the `CF_HDROP` format from the clipboard.
@@ -216,7 +217,8 @@ impl Drop for Clipboard {
 ///It opens clipboard and gets string, if possible.
 #[inline]
 pub fn get_clipboard_string() -> io::Result<String> {
-    Clipboard::new()?.get_string()
+    let mut data = String::new();
+    Clipboard::new_attempts(10)?.get_string(&mut data).map(|_| data)
 }
 
 ///Shortcut to set string onto clipboard.
@@ -224,5 +226,5 @@ pub fn get_clipboard_string() -> io::Result<String> {
 ///It opens clipboard and attempts to set string.
 #[inline]
 pub fn set_clipboard_string(data: &str) -> io::Result<()> {
-    Clipboard::new()?.set_string(data)
+    Clipboard::new_attempts(10)?.set_string(data)
 }
