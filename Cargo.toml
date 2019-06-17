@@ -6,7 +6,7 @@ description = "Provides simple way to interact with Windows clipboard."
 license = "MIT"
 
 keywords = ["Windows", "winapi", "clipboard"]
-categories = ["clipboard"]
+categories = ["os::windows-apis"]
 
 repository = "https://github.com/DoumanAsh/clipboard-win"
 documentation = "https://docs.rs/crate/clipboard-win"
