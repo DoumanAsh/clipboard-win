@@ -5,8 +5,6 @@ use winapi::um::wingdi::{GetDIBits, GetObjectW};
 use std::{ptr, slice, io, mem};
 use std::os::raw::{c_void, c_int, c_long, c_ulong};
 
-use crate::utils;
-
 struct Dc(winapi::shared::windef::HDC);
 
 impl Dc {
@@ -65,7 +63,7 @@ impl Bitmap {
         let data_ptr = &mut data as *mut BITMAP as *mut c_void;
 
         match unsafe { GetObjectW(ptr as *mut c_void, mem::size_of::<BITMAP>() as c_int, data_ptr) } {
-            0 => Err(utils::get_last_error()),
+            0 => Err(io::Error::last_os_error()),
             _ => Ok(Self {
                 inner: ptr as winapi::shared::windef::HBITMAP,
                 data
@@ -102,7 +100,7 @@ impl Bitmap {
     #[doc(hidden)]
     ///Retrieves image as binary.
     ///
-    ///TODO: make it work
+    ///TODO: make it work, currently returns invalid image
     pub fn data(&self) -> io::Result<Vec<u8>> {
         use winapi::um::wingdi::{DIB_RGB_COLORS, BITMAPINFOHEADER, BITMAPINFO};
 
@@ -113,8 +111,9 @@ impl Bitmap {
         header.info.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as c_ulong;
         let data_ptr = &mut header.info as *mut BITMAPINFO;
 
+        //fill header
         match unsafe { GetDIBits(dc.0, self.inner, 0, 0, ptr::null_mut(), data_ptr, DIB_RGB_COLORS) } {
-            0 => return Err(utils::get_last_error()),
+            0 => return Err(io::Error::last_os_error()),
             _ => (),
         }
 
@@ -127,7 +126,7 @@ impl Bitmap {
         unsafe { buffer.set_len(buffer_len) };
 
         match unsafe { GetDIBits(dc.0, self.inner, 0, 0, buffer.get_unchecked_mut(mem::size_of::<BmpHeader>()) as *mut u8 as *mut _, data_ptr, DIB_RGB_COLORS) } {
-            0 => Err(utils::get_last_error()),
+            0 => Err(io::Error::last_os_error()),
             _ => Ok(buffer),
         }
     }

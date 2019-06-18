@@ -269,7 +269,7 @@ pub fn get_string(storage: &mut String) -> io::Result<()> {
         {
             storage.reserve(storage_req_size as usize);
             let storage = storage.as_mut_vec();
-            let storage_ptr = storage.as_mut_ptr().offset(storage.len() as isize) as *mut _;
+            let storage_ptr = storage.as_mut_ptr().add(storage.len()) as *mut _;
             WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr(), data_size as c_int, storage_ptr, storage_req_size, ptr::null(), ptr::null_mut());
             storage.set_len(storage_req_size as usize);
         }
