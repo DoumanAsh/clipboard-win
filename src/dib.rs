@@ -1,6 +1,6 @@
 //!DIB Image wrapper
 use std::os::raw::{c_void};
-use std::io;
+use std::io::{self, Write};
 use core::{slice, mem};
 
 use crate::utils::LockedData;
@@ -75,45 +75,35 @@ impl Image {
     ///Writes data into storage.
     ///
     ///Returns size of written, if there is not enough space returns 0.
-    pub fn write(&self, storage: &mut [u8]) -> usize {
-        let bmp_size = self.size();
+    pub fn write<W: Write>(&self, storage: &mut W) -> io::Result<usize> {
         let dib_size = unsafe {
             (*self.bmp.dib).biSize as usize
         };
 
-        if storage.len() < bmp_size {
-            return 0;
-        }
+        let bmp_header = unsafe {
+            slice::from_raw_parts(&self.bmp.header as *const BmpHeader as *const u8, mem::size_of::<BmpHeader>())
+        };
+        storage.write_all(bmp_header)?;
 
-        let mut storage_ptr = storage.as_mut_ptr();
-        storage_ptr = unsafe {
-            storage_ptr.copy_from_nonoverlapping(&self.bmp.header as *const BmpHeader as *const u8, mem::size_of::<BmpHeader>());
-            storage_ptr.add(mem::size_of::<BmpHeader>())
+        let dib_header = unsafe {
+            slice::from_raw_parts(self.bmp.dib as *const u8, dib_size)
         };
-        storage_ptr = unsafe {
-            storage_ptr.copy_from_nonoverlapping(self.bmp.dib as *const u8, dib_size);
-            storage_ptr.add(dib_size)
-        };
-        unsafe {
+        storage.write_all(dib_header)?;
+
+        let image_data = unsafe {
             let size = (*self.bmp.dib).biSizeImage as usize;
             let dib_ptr = self.bmp.dib as *const u8;
-            storage_ptr.copy_from_nonoverlapping(dib_ptr.add(dib_size) as *const u8, size);
-        }
+            slice::from_raw_parts(dib_ptr.add(dib_size), size)
+        };
+        storage.write_all(image_data)?;
 
-        bmp_size
+        Ok(self.size())
     }
 
     ///Extracts BMP data as Vec.
     pub fn to_vec(&self) -> Vec<u8> {
         let mut data = Vec::with_capacity(self.size());
-        let data_slice = unsafe {
-            slice::from_raw_parts_mut(data.as_mut_ptr(), data.capacity())
-        };
-
-        let written = self.write(data_slice);
-        unsafe {
-            data.set_len(written);
-        }
+        let _ = self.write(&mut data);
 
         data
     }
