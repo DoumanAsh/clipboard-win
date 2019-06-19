@@ -56,6 +56,16 @@ impl Image {
         })
     }
 
+    ///Access raw image data
+    pub fn as_bytes(&self) -> &[u8] {
+        let size = unsafe { winapi::um::winbase::GlobalSize(self._guard.0) };
+        let data_ptr = self.bmp.dib as *const u8;
+
+        unsafe {
+            slice::from_raw_parts(data_ptr, size)
+        }
+    }
+
     #[inline]
     ///Retrieves image size, including header.
     pub fn size(&self) -> usize {
