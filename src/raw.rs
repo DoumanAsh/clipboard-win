@@ -496,8 +496,8 @@ macro_rules! match_format_name {
     ( $name:expr, $( $f:ident ),* ) => {
         match $name {
             $( formats::$f => Some(stringify!($f).to_string()),)*
-            formats::CF_GDIOBJFIRST ... formats::CF_GDIOBJLAST => Some(format!("CF_GDIOBJ{}", $name - formats::CF_GDIOBJFIRST)),
-            formats::CF_PRIVATEFIRST ... formats::CF_PRIVATELAST => Some(format!("CF_PRIVATE{}", $name - formats::CF_PRIVATEFIRST)),
+            formats::CF_GDIOBJFIRST ..= formats::CF_GDIOBJLAST => Some(format!("CF_GDIOBJ{}", $name - formats::CF_GDIOBJFIRST)),
+            formats::CF_PRIVATEFIRST ..= formats::CF_PRIVATELAST => Some(format!("CF_PRIVATE{}", $name - formats::CF_PRIVATEFIRST)),
             _ => {
                 let format_buff = [0u16; 52];
                 unsafe {

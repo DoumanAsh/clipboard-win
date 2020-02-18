@@ -1,5 +1,3 @@
-extern crate clipboard_win;
-
 use std::str;
 
 use clipboard_win::Clipboard;

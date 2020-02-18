@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "3.0.0-alpha.1"
+version = "3.0.0"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "MIT"
@@ -19,6 +19,9 @@ default-target = "x86_64-pc-windows-msvc"
 
 [badges]
 appveyor = { repository = "DoumanAsh/clipboard-win"}
+
+[dependencies]
+lazy-bytes-cast = "3"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"

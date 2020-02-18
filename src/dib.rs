@@ -1,14 +1,18 @@
 //!DIB Image wrapper
 use std::os::raw::{c_void};
 use std::io::{self, Write};
-use core::{slice, mem};
+use core::{slice};
 
 use crate::utils::LockedData;
+
+use lazy_bytes_cast::slice::AsByteSlice;
+
+const HEADER_SIZE: u32 = 14;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct BmpHeader {
-    signature: [u8; 2],
+    signature: u16,
     size: u32,
     reserved: u32,
     offset: u32,
@@ -29,13 +33,13 @@ pub struct Image {
 
 impl Image {
     ///Constructs new image from clipboard data handle.
-    pub fn new(handle: *mut c_void) -> io::Result<Self> {
+    pub(crate) fn from_handle(handle: *mut c_void) -> io::Result<Self> {
         let (data, _guard) = LockedData::new(handle)?;
 
         let dib = data.as_ptr();
         let mut bmp = Bmp {
             header: BmpHeader {
-                signature: [0x42, 0x4D],
+                signature: 0x4D42,
                 size: 0,
                 reserved: 0,
                 offset: 0
@@ -44,8 +48,9 @@ impl Image {
         };
 
         bmp.header.offset = unsafe {
-            mem::size_of::<BmpHeader>() as u32 + (*dib).biSize
+            HEADER_SIZE + (*dib).biSize
         };
+
         bmp.header.size = unsafe {
             (*bmp.dib).biSizeImage + bmp.header.offset
         };
@@ -76,24 +81,32 @@ impl Image {
     ///
     ///Returns size of written, if there is not enough space returns 0.
     pub fn write<W: Write>(&self, storage: &mut W) -> io::Result<usize> {
-        let dib_size = unsafe {
-            (*self.bmp.dib).biSize as usize
-        };
+        //BMP Header
+        storage.write_all(self.bmp.header.signature.as_slice())?;
+        storage.write_all(self.bmp.header.size.as_slice())?;
+        storage.write_all(self.bmp.header.reserved.as_slice())?;
+        storage.write_all(self.bmp.header.offset.as_slice())?;
 
-        let bmp_header = unsafe {
-            slice::from_raw_parts(&self.bmp.header as *const BmpHeader as *const u8, mem::size_of::<BmpHeader>())
+        //DIB Header
+        let dib = unsafe {
+            &*self.bmp.dib
         };
-        storage.write_all(bmp_header)?;
+        storage.write_all(dib.biSize.as_slice())?;
+        storage.write_all(dib.biWidth.as_slice())?;
+        storage.write_all(dib.biHeight.as_slice())?;
+        storage.write_all(dib.biPlanes.as_slice())?;
+        storage.write_all(dib.biBitCount.as_slice())?;
+        storage.write_all(dib.biCompression.as_slice())?;
+        storage.write_all(dib.biSizeImage.as_slice())?;
+        storage.write_all(dib.biXPelsPerMeter.as_slice())?;
+        storage.write_all(dib.biYPelsPerMeter.as_slice())?;
+        storage.write_all(dib.biClrUsed.as_slice())?;
+        storage.write_all(dib.biClrImportant.as_slice())?;
 
-        let dib_header = unsafe {
-            slice::from_raw_parts(self.bmp.dib as *const u8, dib_size)
-        };
-        storage.write_all(dib_header)?;
-
+        //Image data
         let image_data = unsafe {
-            let size = (*self.bmp.dib).biSizeImage as usize;
-            let dib_ptr = self.bmp.dib as *const u8;
-            slice::from_raw_parts(dib_ptr.add(dib_size), size)
+            let image_ptr = self.bmp.dib.add(1) as *const u8;
+            slice::from_raw_parts(image_ptr, dib.biSizeImage as usize)
         };
         storage.write_all(image_data)?;
 
