@@ -9,14 +9,6 @@ use clipboard_win::{
 };
 
 #[test]
-fn seq_num() {
-    let result = raw::seq_num();
-
-    assert!(result.is_some());
-    assert!(result.unwrap() != 0);
-}
-
-#[test]
 fn set_data() {
     let format = formats::CF_TEXT;
     let text = "For my waifu!\0"; //For text we need to pass C-like string
@@ -128,4 +120,8 @@ fn set_data() {
     assert_eq!(result.len(), expected_text.len());
     assert_eq!(result, expected_text);
 
+    let result = raw::seq_num();
+
+    assert!(result.is_some());
+    assert!(result.unwrap() != 0);
 }
