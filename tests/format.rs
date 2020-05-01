@@ -1,5 +1,3 @@
-extern crate clipboard_win;
-
 use clipboard_win::Clipboard;
 use clipboard_win::formats;
 use clipboard_win::raw;

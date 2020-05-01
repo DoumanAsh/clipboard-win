@@ -21,8 +21,6 @@ Below you can find examples of usage.
 ## Empty clipboard
 
 ```rust
-extern crate clipboard_win;
-
 use clipboard_win::Clipboard;
 
 fn main() {
@@ -33,7 +31,6 @@ fn main() {
 ## Set and get raw data
 
 ```rust
-extern crate clipboard_win;
 use clipboard_win::formats;
 
 use clipboard_win::Clipboard;
@@ -53,7 +50,6 @@ fn main() {
 ## Set and get String
 
 ```rust
-extern crate clipboard_win;
 use clipboard_win::Clipboard;
 
 use std::str;
@@ -71,7 +67,6 @@ fn main() {
 ## Set and get String shortcuts
 
 ```rust
-extern crate clipboard_win;
 use clipboard_win::{set_clipboard_string, get_clipboard_string};
 
 use std::str;
