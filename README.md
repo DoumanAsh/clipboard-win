@@ -1,7 +1,7 @@
 clipboard-win
 ====================
 
-[![Build status](https://ci.appveyor.com/api/projects/status/5mkbp9mh5vwpohtn?svg=true)](https://ci.appveyor.com/project/DoumanAsh/clipboard-win)
+![Build](https://github.com/DoumanAsh/clipboard-win/workflows/Rust/badge.svg?branch=3)
 [![Crates.io](https://img.shields.io/crates/v/clipboard-win.svg)](https://crates.io/crates/clipboard-win)
 [![Docs.rs](https://docs.rs/clipboard-win/badge.svg)](https://docs.rs/clipboard-win/*/x86_64-pc-windows-msvc/clipboard_win/)
 

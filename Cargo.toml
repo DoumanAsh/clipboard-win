@@ -21,7 +21,7 @@ default-target = "x86_64-pc-windows-msvc"
 appveyor = { repository = "DoumanAsh/clipboard-win"}
 
 [dependencies]
-lazy-bytes-cast = "4"
+lazy-bytes-cast = "5"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
