@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "3.0.1"
+version = "3.0.2"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "MIT"
@@ -14,11 +14,14 @@ documentation = "https://docs.rs/crate/clipboard-win"
 readme = "README.md"
 edition = "2018"
 
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
-
-[badges]
-appveyor = { repository = "DoumanAsh/clipboard-win"}
 
 [dependencies]
 lazy-bytes-cast = "5"
@@ -34,8 +37,3 @@ features = [
     "winuser",
     "stringapiset",
 ]
-
-[lib]
-name = "clipboard_win"
-path = "src/lib.rs"
-test = false
