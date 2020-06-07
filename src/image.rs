@@ -67,10 +67,6 @@ pub struct Image {
     pub bytes: Vec<u8>,
 }
 
-fn io_error(message: &'static str) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, message)
-}
-
 impl Image {
     pub(crate) fn from_handle(handle: ptr::NonNull<c_void>) -> io::Result<Self> {
         let mut bitmap = BITMAP {
@@ -91,7 +87,7 @@ impl Image {
             )
         } == 0
         {
-            return Err(io_error("!GetObjectW"));
+            return Err(io::Error::last_os_error());
         }
 
         let clr_bits = bitmap.bmPlanes * bitmap.bmBitsPixel;
@@ -118,7 +114,7 @@ impl Image {
         };
         let mut info = match info {
             Some(info) => info,
-            None => return Err(io_error("!LocalMemory")),
+            None => return Err(io::Error::last_os_error()),
         };
 
         info.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as _;
@@ -151,7 +147,7 @@ impl Image {
             )
         } == 0
         {
-            return Err(io_error("!GetDIBits"));
+            return Err(io::Error::last_os_error());
         }
 
         let mut stream = Vec::new();
