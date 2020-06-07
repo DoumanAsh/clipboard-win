@@ -1,14 +1,13 @@
 //! Image module
 
 use std::{
-    io::{self, Cursor, Write},
+    io::{self, Cursor, Read, Write},
     mem,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr, slice,
 };
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use winapi::{
     shared::windef::HDC,
     um::{
@@ -156,33 +155,33 @@ impl Image {
         }
 
         let mut stream = Vec::new();
-        stream.write_u16::<LittleEndian>(0x4d42)?;
-        stream.write_u32::<LittleEndian>(
+        stream.extend_from_slice(&u16::to_le_bytes(0x4d42));
+        stream.extend_from_slice(&u32::to_le_bytes(
             mem::size_of::<BITMAPFILEHEADER>() as u32
                 + info.bmiHeader.biSize
                 + info.bmiHeader.biClrUsed * mem::size_of::<RGBQUAD>() as u32
                 + info.bmiHeader.biSizeImage,
-        )?;
-        stream.write_u16::<LittleEndian>(0)?;
-        stream.write_u16::<LittleEndian>(0)?;
-        stream.write_u32::<LittleEndian>(
+        ));
+        stream.extend_from_slice(&u16::to_le_bytes(0));
+        stream.extend_from_slice(&u16::to_le_bytes(0));
+        stream.extend_from_slice(&u32::to_le_bytes(
             mem::size_of::<BITMAPFILEHEADER>() as u32
                 + info.bmiHeader.biSize
                 + info.bmiHeader.biClrUsed * mem::size_of::<RGBQUAD>() as u32,
-        )?;
+        ));
 
         let h = &info.bmiHeader;
-        stream.write_u32::<LittleEndian>(h.biSize)?;
-        stream.write_i32::<LittleEndian>(h.biWidth)?;
-        stream.write_i32::<LittleEndian>(h.biHeight)?;
-        stream.write_u16::<LittleEndian>(h.biPlanes)?;
-        stream.write_u16::<LittleEndian>(h.biBitCount)?;
-        stream.write_u32::<LittleEndian>(h.biCompression)?;
-        stream.write_u32::<LittleEndian>(h.biSizeImage)?;
-        stream.write_i32::<LittleEndian>(h.biXPelsPerMeter)?;
-        stream.write_i32::<LittleEndian>(h.biYPelsPerMeter)?;
-        stream.write_u32::<LittleEndian>(h.biClrUsed)?;
-        stream.write_u32::<LittleEndian>(h.biClrImportant)?;
+        stream.extend_from_slice(&h.biSize.to_le_bytes());
+        stream.extend_from_slice(&h.biWidth.to_le_bytes());
+        stream.extend_from_slice(&h.biHeight.to_le_bytes());
+        stream.extend_from_slice(&h.biPlanes.to_le_bytes());
+        stream.extend_from_slice(&h.biBitCount.to_le_bytes());
+        stream.extend_from_slice(&h.biCompression.to_le_bytes());
+        stream.extend_from_slice(&h.biSizeImage.to_le_bytes());
+        stream.extend_from_slice(&h.biXPelsPerMeter.to_le_bytes());
+        stream.extend_from_slice(&h.biYPelsPerMeter.to_le_bytes());
+        stream.extend_from_slice(&h.biClrUsed.to_le_bytes());
+        stream.extend_from_slice(&h.biClrImportant.to_le_bytes());
 
         let colors = unsafe {
             slice::from_raw_parts(info.bmiColors.as_ptr(), info.bmiHeader.biClrUsed as _)
@@ -200,27 +199,54 @@ impl Image {
     }
 
     pub(crate) fn write_to_clipboard(&self) -> io::Result<()> {
+        fn read_u16<R>(stream: &mut R) -> io::Result<u16>
+        where
+            R: Read,
+        {
+            let mut buf = [0 as u8; 2];
+            stream.read_exact(&mut buf)?;
+            Ok(u16::from_le_bytes(buf))
+        }
+
+        fn read_u32<R>(stream: &mut R) -> io::Result<u32>
+        where
+            R: Read,
+        {
+            let mut buf = [0 as u8; 4];
+            stream.read_exact(&mut buf)?;
+            Ok(u32::from_le_bytes(buf))
+        }
+
+        fn read_i32<R>(stream: &mut R) -> io::Result<i32>
+        where
+            R: Read,
+        {
+            let mut buf = [0 as u8; 4];
+            stream.read_exact(&mut buf)?;
+            Ok(i32::from_le_bytes(buf))
+        }
+
         let mut stream = Cursor::new(&self.bytes);
         let file_header = BITMAPFILEHEADER {
-            bfType: stream.read_u16::<LittleEndian>()?,
-            bfSize: stream.read_u32::<LittleEndian>()?,
-            bfReserved1: stream.read_u16::<LittleEndian>()?,
-            bfReserved2: stream.read_u16::<LittleEndian>()?,
-            bfOffBits: stream.read_u32::<LittleEndian>()?,
+            bfType: read_u16(&mut stream)?,
+            bfSize: read_u32(&mut stream)?,
+            bfReserved1: read_u16(&mut stream)?,
+            bfReserved2: read_u16(&mut stream)?,
+            bfOffBits: read_u32(&mut stream)?,
         };
 
         let info_header = BITMAPINFOHEADER {
-            biSize: stream.read_u32::<LittleEndian>()?,
-            biWidth: stream.read_i32::<LittleEndian>()?,
-            biHeight: stream.read_i32::<LittleEndian>()?,
-            biPlanes: stream.read_u16::<LittleEndian>()?,
-            biBitCount: stream.read_u16::<LittleEndian>()?,
-            biCompression: stream.read_u32::<LittleEndian>()?,
-            biSizeImage: stream.read_u32::<LittleEndian>()?,
-            biXPelsPerMeter: stream.read_i32::<LittleEndian>()?,
-            biYPelsPerMeter: stream.read_i32::<LittleEndian>()?,
-            biClrUsed: stream.read_u32::<LittleEndian>()?,
-            biClrImportant: stream.read_u32::<LittleEndian>()?,
+            biSize: read_u32(&mut stream)?,
+            biWidth: read_i32(&mut stream)?,
+            biHeight: read_i32(&mut stream)?,
+            biPlanes: read_u16(&mut stream)?,
+            biBitCount: read_u16(&mut stream)?,
+            biCompression: read_u32(&mut stream)?,
+            biSizeImage: read_u32(&mut stream)?,
+            biXPelsPerMeter: read_i32(&mut stream)?,
+            biYPelsPerMeter: read_i32(&mut stream)?,
+            biClrUsed: read_u32(&mut stream)?,
+            biClrImportant: read_u32(&mut stream)?,
         };
 
         let info = &info_header as *const _ as *const BITMAPINFO;
