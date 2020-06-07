@@ -1,12 +1,10 @@
-use std::str;
+use std::{fs, str};
 
-use clipboard_win::Clipboard;
 use clipboard_win::formats;
+use clipboard_win::image;
 use clipboard_win::raw;
-use clipboard_win::{
-    get_clipboard_string,
-    set_clipboard_string
-};
+use clipboard_win::Clipboard;
+use clipboard_win::{get_clipboard_string, set_clipboard_string};
 
 #[test]
 fn set_data() {
@@ -21,6 +19,15 @@ fn set_data() {
     let clipboard = Clipboard::new();
     assert!(clipboard.is_ok());
     let clipboard = clipboard.unwrap();
+
+    //Check setting and getting bitmap image
+    let test_image_bytes = fs::read("tests/test-image.bmp").unwrap();
+    let image_from_bytes = image::Image {
+        bytes: test_image_bytes,
+    };
+    clipboard.set_bitmap(&image_from_bytes).unwrap();
+    let image_from_clipboard = clipboard.get_bitmap().unwrap();
+    assert_eq!(image_from_bytes.bytes, image_from_clipboard.bytes);
 
     let result = clipboard.empty();
     assert!(result.is_ok());
@@ -105,7 +112,7 @@ fn set_data() {
 
     let expected_text = "For my waifu!";
     let text = "For my waifu!\0gg"; //Pass some garbage after \0
-    //Check set of wide utf-8 bytes
+                                    //Check set of wide utf-8 bytes
     let seq_num_before = Clipboard::seq_num();
     let result = set_clipboard_string(text);
     assert!(result.is_ok());

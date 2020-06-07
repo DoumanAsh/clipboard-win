@@ -196,7 +196,7 @@ impl Clipboard {
 
     #[inline]
     ///Sets bitmap image onto clipboard as `CF_BITMAP`
-    pub fn set_bitmap(&self, image: image::Image) -> io::Result<()> {
+    pub fn set_bitmap(&self, image: &image::Image) -> io::Result<()> {
         image.write_to_clipboard()
     }
 
