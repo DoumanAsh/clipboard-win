@@ -84,6 +84,7 @@
 pub mod formats;
 pub mod raw;
 pub mod dib;
+pub mod image;
 pub mod utils;
 
 use std::{io};
@@ -185,6 +186,18 @@ impl Clipboard {
     pub fn get_dib(&self) -> io::Result<dib::Image> {
         raw::get_clipboard_data(formats::CF_DIB).or_else(|_| raw::get_clipboard_data(formats::CF_DIBV5))
                                                 .and_then(|handle| dib::Image::from_handle(handle.as_ptr()))
+    }
+
+    #[inline]
+    ///Retrieves `Bitmap` of `CF_BITMAP`
+    pub fn get_bitmap(&self) -> io::Result<image::Image> {
+        raw::get_clipboard_data(formats::CF_BITMAP).and_then(|handle| image::Image::from_handle(handle))
+    }
+
+    #[inline]
+    ///Sets bitmap image onto clipboard as `CF_BITMAP`
+    pub fn set_bitmap(&self, image: image::Image) -> io::Result<()> {
+        image.write_to_clipboard()
     }
 
     ///Enumerator over all formats on clipboard..
