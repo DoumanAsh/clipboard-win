@@ -112,7 +112,7 @@ fn set_data() {
 
     let expected_text = "For my waifu!";
     let text = "For my waifu!\0gg"; //Pass some garbage after \0
-                                    //Check set of wide utf-8 bytes
+    //Check set of wide utf-8 bytes
     let seq_num_before = Clipboard::seq_num();
     let result = set_clipboard_string(text);
     assert!(result.is_ok());
