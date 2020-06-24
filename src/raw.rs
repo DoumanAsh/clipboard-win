@@ -10,7 +10,7 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW};
+use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData};
 use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::ctypes::{c_int, c_uint};
@@ -19,14 +19,16 @@ use winapi::um::winnls::CP_UTF8;
 
 use str_buf::StrBuf;
 
-use core::{slice, mem, ptr};
+use core::{slice, mem, ptr, cmp};
 use core::ffi::c_void;
-use core::num::NonZeroU32;
+use core::num::{NonZeroUsize, NonZeroU32};
 
 use alloc::string::String;
 use alloc::borrow::ToOwned;
 use alloc::format;
+
 use crate::formats;
+use crate::utils::{WinMem, WinMemImpl, WinMemLock};
 
 #[inline(always)]
 ///Returns last winapi error code.
@@ -106,11 +108,8 @@ pub fn empty() -> bool {
 ///
 ///* ```Some``` Contains return value of ```GetClipboardSequenceNumber```.
 ///* ```None``` In case if you do not have access. It means that zero is returned by system.
-pub fn seq_num() -> Option<u32> {
-    match unsafe { GetClipboardSequenceNumber() } {
-        0 => None,
-        num => Some(num)
-    }
+pub fn seq_num() -> Option<NonZeroU32> {
+    unsafe { NonZeroU32::new(GetClipboardSequenceNumber()) }
 }
 
 #[inline]
@@ -130,11 +129,11 @@ pub fn seq_num() -> Option<u32> {
 ///Bitmap)
 ///
 ///Due to that function is marked as unsafe
-pub unsafe fn size_unsafe(format: u32) -> Option<usize> {
+pub unsafe fn size_unsafe(format: u32) -> Option<NonZeroUsize> {
     let clipboard_data = GetClipboardData(format);
 
     match clipboard_data.is_null() {
-        false => Some(GlobalSize(clipboard_data) as usize),
+        false => NonZeroUsize::new(GlobalSize(clipboard_data) as usize),
         true => None,
     }
 }
@@ -149,7 +148,7 @@ pub unsafe fn size_unsafe(format: u32) -> Option<usize> {
 ///# Returns:
 ///
 ///Size in bytes if format presents on clipboard.
-pub fn size(format: u32) -> Option<usize> {
+pub fn size(format: u32) -> Option<NonZeroUsize> {
     let clipboard_data = unsafe {GetClipboardData(format)};
 
     if clipboard_data.is_null() {
@@ -161,7 +160,7 @@ pub fn size(format: u32) -> Option<usize> {
             return None;
         }
 
-        let result = Some(GlobalSize(clipboard_data) as usize);
+        let result = NonZeroUsize::new(GlobalSize(clipboard_data) as usize);
 
         GlobalUnlock(clipboard_data);
 
@@ -201,6 +200,142 @@ pub fn count_formats() -> Option<usize> {
     }
 
     Some(result as usize)
+}
+
+///Copies raw bytes from clipboard with specified `format`
+///
+///Returns number of copied bytes on success, otherwise 0.
+///
+///It is safe to pass uninit memory
+pub fn get(format: u32, out: &mut [u8]) -> usize {
+    let size = out.len();
+    debug_assert!(size > 0);
+    let out_ptr = out.as_mut_ptr();
+
+    unsafe {
+        if let Some(ptr) = smart_ptr::unique::NonMem::from_ptr_default(winapi::um::winuser::GetClipboardData(format)) {
+            return ptr.with_lock(|data_ptr| {
+                let data_size = cmp::min(GlobalSize(ptr.get()) as usize, size);
+                ptr::copy_nonoverlapping(data_ptr.as_ptr() as *const u8, out_ptr, data_size);
+                data_size
+            }).unwrap_or(0)
+        }
+    }
+
+    0
+}
+
+///Copies raw bytes from clipboard with specified `format`, appending to `out` buffer.
+///
+///Returns number of copied bytes on success, otherwise 0.
+pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> usize {
+    let out = out as *mut alloc::vec::Vec<u8>;
+
+    unsafe {
+        if let Some(ptr) = smart_ptr::unique::NonMem::from_ptr_default(winapi::um::winuser::GetClipboardData(format)) {
+            return ptr.with_lock(|data_ptr| {
+                let data_size = GlobalSize(ptr.get()) as usize;
+
+                (*out).reserve(data_size as usize);
+                let storage_cursor = (*out).len();
+                let storage_ptr = (*out).as_mut_ptr().add((*out).len()) as *mut _;
+
+                ptr::copy_nonoverlapping(data_ptr.as_ptr() as *const u8, storage_ptr, data_size);
+                (*out).set_len(storage_cursor + data_size as usize);
+
+                data_size
+            }).unwrap_or(0)
+        }
+    }
+
+    0
+}
+
+///Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
+pub fn set(format: u32, data: &[u8]) -> bool {
+    let size = data.len();
+    debug_assert!(size > 0);
+
+    if let Some(mem) = WinMem::new_global_mem(size) {
+        mem.with_lock(|ptr| unsafe { ptr::copy_nonoverlapping(data.as_ptr(), ptr.as_ptr() as _, size) });
+        empty();
+
+        if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
+            //SetClipboardData takes ownership
+            mem.release();
+            return true;
+        }
+    }
+
+    false
+}
+
+///Copies raw bytes from clipboard with specified `format`, appending to `out` buffer.
+///
+///Returns number of copied bytes on success, otherwise 0.
+pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> usize {
+    let out = out as *mut alloc::vec::Vec<u8>;
+
+    unsafe {
+        if let Some(ptr) = smart_ptr::unique::NonMem::from_ptr_default(GetClipboardData(formats::CF_UNICODETEXT)) {
+            return ptr.with_lock(|data_ptr| {
+                let data_size = GlobalSize(ptr.get()) as usize / mem::size_of::<u16>();
+                let storage_req_size = WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr() as _, data_size as _, ptr::null_mut(), 0, ptr::null(), ptr::null_mut());
+
+                if storage_req_size == 0 {
+                    return 0;
+                }
+
+                let storage_cursor = (*out).len();
+                (*out).reserve(storage_req_size as usize);
+                let storage_ptr = (*out).as_mut_ptr().add(storage_cursor) as *mut _;
+                WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr() as _, data_size as _, storage_ptr, storage_req_size, ptr::null(), ptr::null_mut());
+                (*out).set_len(storage_cursor + storage_req_size as usize);
+
+                //It seems WinAPI always supposed to have at the end null char.
+                //But just to be safe let's check for it and only then remove.
+                if let Some(null_idx) = (*out).iter().skip(storage_cursor).position(|b| *b == b'\0') {
+                    (*out).set_len(storage_cursor + null_idx);
+                }
+
+                (*out).len() - storage_cursor
+            }).unwrap_or(0);
+        }
+    }
+
+    0
+}
+
+///Copies unicode string onto clipboard, performing necessary conversions, returning true on
+///success.
+pub fn set_string(data: &str) -> bool {
+    debug_assert!(data.len() > 0);
+
+    let size = unsafe {
+        MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
+    };
+
+    if size == 0 {
+        return false;
+    }
+
+    if let Some(mem) = WinMem::new_global_mem((mem::size_of::<u16>() * (size as usize + 1)) as _) {
+        mem.with_lock(|ptr| unsafe {
+            let ptr = ptr.as_ptr() as *mut u16;
+            MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr, size);
+            ptr::write(ptr.offset(size as isize), 0);
+        });
+
+        crate::raw::empty();
+
+        if unsafe { !SetClipboardData(formats::CF_UNICODETEXT, mem.get()).is_null() } {
+            //SetClipboardData takes ownership
+            mem.release();
+            return true;
+        }
+    }
+
+    false
 }
 
 ///Enumerator over available clipboard formats.

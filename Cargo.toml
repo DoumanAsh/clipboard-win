@@ -25,6 +25,7 @@ default-target = "x86_64-pc-windows-msvc"
 
 [dependencies]
 lazy-bytes-cast = "5"
+smart-ptr = "0.4"
 str-buf = "1"
 
 [target.'cfg(windows)'.dependencies.winapi]
