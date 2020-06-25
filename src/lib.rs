@@ -21,6 +21,8 @@
 //!
 //!# Usage
 //!
+//!## Manually lock clipboard
+//!
 //!```
 //!use clipboard_win::{Clipboard, formats, Getter, Setter};
 //!
@@ -42,6 +44,20 @@
 //!//Or take the same string twice?
 //!assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
 //!assert_eq!(format!("{0}{0}", SAMPLE), output);
+//!
+//!```
+//!
+//!## Simplified API
+//!
+//!```
+//!use clipboard_win::{formats, get_clipboard, set_clipboard};
+//!
+//!let text = "my sample ><";
+//!
+//!set_clipboard(formats::Unicode, text).expect("To set clipboard");
+//!//Type is necessary as string can be stored in various storages
+//!let result: String = get_clipboard(formats::Unicode).expect("To set clipboard");
+//!assert_eq!(result, text)
 //!```
 
 #![no_std]
@@ -139,4 +155,51 @@ pub fn with_clipboard_attempts<F: FnMut()>(num: usize, mut cb: F) -> SysResult<(
     let _clip = Clipboard::new_attempts(num)?;
     cb();
     Ok(())
+}
+
+#[inline(always)]
+///Retrieve data from clipboard.
+pub fn get<R: Default, T: Getter<R>>(format: T) -> SysResult<R> {
+    let mut result = R::default();
+    format.read_clipboard(&mut result).map(|_| result)
+}
+
+#[inline(always)]
+///Shortcut to retrieve data from clipboard.
+///
+///It opens clipboard and gets output, if possible.
+pub fn get_clipboard<R: Default, T: Getter<R>>(format: T) -> SysResult<R> {
+    let _clip = Clipboard::new_attempts(10)?;
+    get(format)
+}
+
+#[inline(always)]
+///Set data onto clipboard.
+pub fn set<R, T: Setter<R>>(format: T, data: R) -> SysResult<()> {
+    format.write_clipboard(&data)
+}
+
+#[inline(always)]
+///Shortcut to set data onto clipboard.
+///
+///It opens clipboard and attempts to set data.
+pub fn set_clipboard<R, T: Setter<R>>(format: T, data: R) -> SysResult<()> {
+    let _clip = Clipboard::new_attempts(10)?;
+    set(format, data)
+}
+
+///Shortcut to retrieve string from clipboard.
+///
+///It opens clipboard and gets string, if possible.
+#[inline(always)]
+pub fn get_clipboard_string() -> SysResult<alloc::string::String> {
+    get_clipboard(Unicode)
+}
+
+///Shortcut to set string onto clipboard.
+///
+///It opens clipboard and attempts to set string.
+#[inline(always)]
+pub fn set_clipboard_string(data: &str) -> SysResult<()> {
+    set_clipboard(Unicode, data)
 }
