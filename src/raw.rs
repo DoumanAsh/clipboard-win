@@ -269,9 +269,10 @@ pub fn get_string(storage: &mut String) -> io::Result<()> {
         {
             storage.reserve(storage_req_size as usize);
             let storage = storage.as_mut_vec();
-            let storage_ptr = storage.as_mut_ptr().add(storage.len()) as *mut _;
+            let storage_cursor = storage.len();
+            let storage_ptr = storage.as_mut_ptr().add(storage_cursor) as *mut _;
             WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr(), data_size as c_int, storage_ptr, storage_req_size, ptr::null(), ptr::null_mut());
-            storage.set_len(storage_req_size as usize);
+            storage.set_len(storage_cursor + storage_req_size as usize);
         }
 
         //It seems WinAPI always supposed to have at the end null char.
@@ -290,7 +291,7 @@ pub fn get_string(storage: &mut String) -> io::Result<()> {
 ///
 /// * [open()](fn.open.html) has been called.
 pub fn get_file_list() -> io::Result<Vec<PathBuf>> {
-    let clipboard_data = get_clipboard_data(formats::CF_UNICODETEXT)?;
+    let clipboard_data = get_clipboard_data(formats::CF_HDROP)?;
     let clipboard_data = clipboard_data.as_ptr();
 
     unsafe {
