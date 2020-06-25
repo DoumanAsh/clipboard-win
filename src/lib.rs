@@ -27,20 +27,20 @@
 //!const SAMPLE: &str = "MY loli sample ^^";
 //!
 //!let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
-//!assert!(formats::Unicode.write_clipboard(&SAMPLE));
+//!formats::Unicode.write_clipboard(&SAMPLE).expect("Write sample");
 //!
 //!let mut output = String::new();
 //!
-//!assert_eq!(formats::Unicode.read_clipboard(&mut output), SAMPLE.len());
+//!assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
 //!assert_eq!(output, SAMPLE);
 //!
 //!//Efficiently re-use buffer ;)
 //!output.clear();
-//!assert_eq!(formats::Unicode.read_clipboard(&mut output), SAMPLE.len());
+//!assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
 //!assert_eq!(output, SAMPLE);
 //!
 //!//Or take the same string twice?
-//!assert_eq!(formats::Unicode.read_clipboard(&mut output), SAMPLE.len());
+//!assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
 //!assert_eq!(format!("{0}{0}", SAMPLE), output);
 //!```
 
@@ -56,6 +56,9 @@ pub(crate) mod utils;
 
 pub use raw::{empty, seq_num, size, is_format_avail, EnumFormats};
 pub use formats::Unicode;
+
+///Alias to result used by this crate
+pub type SysResult<T> = Result<T, error_code::SystemError>;
 
 ///Clipboard instance, which allows to perform clipboard ops.
 ///
@@ -74,28 +77,22 @@ pub struct Clipboard {
 }
 
 impl Clipboard {
+    #[inline(always)]
     ///Attempts to open clipboard, returning clipboard instance on success.
-    pub fn new() -> Option<Self> {
-        match raw::open() {
-            true => Some(Self {
-                _dummy: (),
-            }),
-            false => None
-        }
+    pub fn new() -> SysResult<Self> {
+        raw::open().map(|_| Self { _dummy: () })
     }
 
     #[inline]
     ///Attempts to open clipboard, giving it `num` retries in case of failure.
-    pub fn new_attempts(mut num: usize) -> Option<Self> {
+    pub fn new_attempts(mut num: usize) -> SysResult<Self> {
         loop {
-            if raw::open() {
-                break Some(Self {
-                    _dummy: ()
-                })
-            } else if num == 0 {
-                break None
-            } else {
-                num -= 1;
+            match Self::new() {
+                Ok(this) => break Ok(this),
+                Err(err) => match num {
+                    0 => break Err(err),
+                    _ => num -= 1,
+                }
             }
         }
     }
@@ -112,7 +109,7 @@ impl Drop for Clipboard {
 ///Default implementations only perform write, without opening/closing clipboard
 pub trait Getter<Type> {
     ///Reads content of clipboard into `out`, returning number of bytes read on success, or otherwise 0.
-    fn read_clipboard(&self, out: &mut Type) -> usize;
+    fn read_clipboard(&self, out: &mut Type) -> SysResult<usize>;
 }
 
 ///Describes format setter, specifying data type as type param
@@ -120,25 +117,17 @@ pub trait Getter<Type> {
 ///Default implementations only perform write, without opening/closing clipboard
 pub trait Setter<Type> {
     ///Writes content of `data` onto clipboard, returning whether it was successful or not
-    fn write_clipboard(&self, data: &Type) -> bool;
+    fn write_clipboard(&self, data: &Type) -> SysResult<()>;
 }
 
 #[inline(always)]
 ///Runs provided callable with open clipboard, returning whether clipboard was open successfully.
 ///
 ///If clipboard fails to open, callable is not invoked.
-pub fn with_clipboard<F: FnMut()>(mut cb: F) -> bool {
-    if raw::open() {
-        //Remember, user code can panic, so we should rely on dtor
-        let _clip = Clipboard {
-            _dummy: ()
-        };
-
-        cb();
-        true
-    } else {
-        false
-    }
+pub fn with_clipboard<F: FnMut()>(mut cb: F) -> SysResult<()> {
+    let _clip = Clipboard::new()?;
+    cb();
+    Ok(())
 }
 
 #[inline(always)]
@@ -146,20 +135,8 @@ pub fn with_clipboard<F: FnMut()>(mut cb: F) -> bool {
 ///
 ///If clipboard fails to open, attempts `num` number of retries before giving up.
 ///In which case closure is not called
-pub fn with_clipboard_attempts<F: FnMut()>(mut num: usize, mut cb: F) -> bool {
-    loop {
-        if raw::open() {
-            //Remember, user code can panic, so we should rely on dtor
-            let _clip = Clipboard {
-                _dummy: ()
-            };
-
-            cb();
-            break true;
-        } else if num == 0 {
-            break false;
-        } else {
-            num -= 1;
-        }
-    }
+pub fn with_clipboard_attempts<F: FnMut()>(num: usize, mut cb: F) -> SysResult<()> {
+    let _clip = Clipboard::new_attempts(num)?;
+    cb();
+    Ok(())
 }

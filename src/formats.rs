@@ -5,7 +5,7 @@
 //!
 //! Description is taken from [Standard Clipboard Formats](https://msdn.microsoft.com/en-us/library/windows/desktop/ff729168%28v=vs.85%29.aspx)
 
-use crate::{Getter, Setter};
+use crate::{SysResult, Getter, Setter};
 
 use winapi::um::winuser;
 
@@ -82,14 +82,14 @@ pub struct RawData(pub u32);
 
 impl<T: AsRef<[u8]>> Setter<T> for RawData {
     #[inline(always)]
-    fn write_clipboard(&self, data: &T) -> bool {
+    fn write_clipboard(&self, data: &T) -> SysResult<()> {
         crate::raw::set(self.0, data.as_ref())
     }
 }
 
 impl Getter<alloc::vec::Vec<u8>> for RawData {
     #[inline(always)]
-    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> usize {
+    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
         crate::raw::get_vec(self.0, out)
     }
 }
@@ -101,21 +101,21 @@ pub struct Unicode;
 
 impl Getter<alloc::vec::Vec<u8>> for Unicode {
     #[inline(always)]
-    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> usize {
+    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
         crate::raw::get_string(out)
     }
 }
 
 impl Getter<alloc::string::String> for Unicode {
     #[inline(always)]
-    fn read_clipboard(&self, out: &mut alloc::string::String) -> usize {
+    fn read_clipboard(&self, out: &mut alloc::string::String) -> SysResult<usize> {
         self.read_clipboard(unsafe { out.as_mut_vec() })
     }
 }
 
 impl<T: AsRef<str>> Setter<T> for Unicode {
     #[inline(always)]
-    fn write_clipboard(&self, data: &T) -> bool {
+    fn write_clipboard(&self, data: &T) -> SysResult<()> {
         crate::raw::set_string(data.as_ref())
     }
 }
