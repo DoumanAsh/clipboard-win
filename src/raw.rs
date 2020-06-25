@@ -15,6 +15,7 @@ use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::ctypes::{c_int, c_uint, c_void};
 use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
 use winapi::um::winnls::CP_UTF8;
+use winapi::um::shellapi::{DragQueryFileW};
 
 use str_buf::StrBuf;
 use error_code::SystemError;
@@ -316,6 +317,41 @@ pub fn set_string(data: &str) -> SysResult<()> {
     }
 
     Err(error_code::SystemError::last())
+}
+
+///Retrieves file list from clipboard, appending each element to the provided storage.
+///
+///Returns number of appended file names.
+pub fn get_file_list(out: &mut alloc::vec::Vec<alloc::string::String>) -> SysResult<usize> {
+    let clipboard_data = WinMem::from_borrowed(get_clipboard_data(formats::CF_HDROP)?);
+
+    let (_data_ptr, _lock) = clipboard_data.lock()?;
+
+    let num_files = unsafe { DragQueryFileW(clipboard_data.get() as _, u32::MAX, ptr::null_mut(), 0) };
+    out.reserve(num_files as usize);
+
+    let mut buffer = alloc::vec::Vec::new();
+
+    for idx in 0..num_files {
+        let required_size_no_null = unsafe { DragQueryFileW(clipboard_data.get() as _, idx, ptr::null_mut(), 0) };
+        if required_size_no_null == 0 {
+            return Err(SystemError::last());
+        }
+
+        let required_size = required_size_no_null + 1;
+        buffer.reserve(required_size as usize);
+
+        if unsafe { DragQueryFileW(clipboard_data.get() as _, idx, buffer.as_mut_ptr(), required_size) == 0 } {
+            return Err(SystemError::last());
+        }
+
+        unsafe {
+            buffer.set_len(required_size_no_null as usize);
+        }
+        out.push(alloc::string::String::from_utf16_lossy(&buffer));
+    }
+
+    Ok(num_files as usize)
 }
 
 ///Enumerator over available clipboard formats.
