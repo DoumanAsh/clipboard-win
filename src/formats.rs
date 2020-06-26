@@ -133,3 +133,22 @@ impl Getter<alloc::vec::Vec<alloc::string::String>> for FileList {
         crate::raw::get_file_list(out)
     }
 }
+
+///Format for bitmap images i.e. `CF_BITMAP`.
+///
+///Both `Getter` and `Setter` expects image as header and rgb payload
+pub struct Bitmap;
+
+impl Getter<alloc::vec::Vec<u8>> for Bitmap {
+    #[inline(always)]
+    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
+        crate::raw::get_bitmap(out)
+    }
+}
+
+impl<T: AsRef<[u8]>> Setter<T> for Bitmap {
+    #[inline(always)]
+    fn write_clipboard(&self, data: &T) -> SysResult<()> {
+        crate::raw::set_bitamp(data.as_ref())
+    }
+}

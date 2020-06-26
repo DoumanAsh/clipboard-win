@@ -36,6 +36,7 @@ features = [
     "shellapi",
     "winbase",
     "winuser",
+    "winerror",
     "stringapiset",
     "errhandlingapi",
 ]

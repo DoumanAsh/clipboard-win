@@ -10,12 +10,15 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData};
+use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData, GetDC, ReleaseDC};
 use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::ctypes::{c_int, c_uint, c_void};
 use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
 use winapi::um::winnls::CP_UTF8;
 use winapi::um::shellapi::{DragQueryFileW};
+use winapi::um::wingdi::{GetObjectW, GetDIBits, CreateDIBitmap, BITMAP, BITMAPINFO, BITMAPINFOHEADER, RGBQUAD, BI_RGB, DIB_RGB_COLORS, BITMAPFILEHEADER, CBM_INIT};
+use winapi::shared::windef::{HDC};
+use winapi::shared::winerror::ERROR_INCORRECT_SIZE;
 
 use str_buf::StrBuf;
 use error_code::SystemError;
@@ -28,7 +31,14 @@ use alloc::borrow::ToOwned;
 use alloc::format;
 
 use crate::{SysResult, formats};
-use crate::utils::{WinMem};
+use crate::utils::{RawMem};
+
+#[inline(always)]
+fn free_dc(data: HDC) {
+    unsafe {
+        ReleaseDC(ptr::null_mut(), data);
+    }
+}
 
 #[inline]
 ///Opens clipboard.
@@ -196,7 +206,7 @@ pub fn get(format: u32, out: &mut [u8]) -> SysResult<usize> {
     debug_assert!(size > 0);
     let out_ptr = out.as_mut_ptr();
 
-    let ptr = WinMem::from_borrowed(get_clipboard_data(format)?);
+    let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
 
     let result = unsafe {
         let (data_ptr, _lock) = ptr.lock()?;
@@ -212,7 +222,7 @@ pub fn get(format: u32, out: &mut [u8]) -> SysResult<usize> {
 ///
 ///Returns number of copied bytes on success, otherwise 0.
 pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
-    let ptr = WinMem::from_borrowed(get_clipboard_data(format)?);
+    let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
 
     let result = unsafe {
         let (data_ptr, _lock) = ptr.lock()?;
@@ -236,7 +246,7 @@ pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
     let size = data.len();
     debug_assert!(size > 0);
 
-    let mem = WinMem::new_global_mem(size)?;
+    let mem = RawMem::new_global_mem(size)?;
 
     {
         let (ptr, _lock) = mem.lock()?;
@@ -258,7 +268,7 @@ pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
 ///
 ///Returns number of copied bytes on success, otherwise 0.
 pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
-    let ptr = WinMem::from_borrowed(get_clipboard_data(formats::CF_UNICODETEXT)?);
+    let ptr = RawMem::from_borrowed(get_clipboard_data(formats::CF_UNICODETEXT)?);
 
     let result = unsafe {
         let (data_ptr, _lock) = ptr.lock()?;
@@ -297,7 +307,7 @@ pub fn set_string(data: &str) -> SysResult<()> {
     };
 
     if size != 0 {
-        let mem = WinMem::new_global_mem((mem::size_of::<u16>() * (size as usize + 1)) as _)?;
+        let mem = RawMem::new_global_mem((mem::size_of::<u16>() * (size as usize + 1)) as _)?;
         {
             let (ptr, _lock) = mem.lock()?;
             let ptr = ptr.as_ptr() as *mut u16;
@@ -323,7 +333,7 @@ pub fn set_string(data: &str) -> SysResult<()> {
 ///
 ///Returns number of appended file names.
 pub fn get_file_list(out: &mut alloc::vec::Vec<alloc::string::String>) -> SysResult<usize> {
-    let clipboard_data = WinMem::from_borrowed(get_clipboard_data(formats::CF_HDROP)?);
+    let clipboard_data = RawMem::from_borrowed(get_clipboard_data(formats::CF_HDROP)?);
 
     let (_data_ptr, _lock) = clipboard_data.lock()?;
 
@@ -352,6 +362,155 @@ pub fn get_file_list(out: &mut alloc::vec::Vec<alloc::string::String>) -> SysRes
     }
 
     Ok(num_files as usize)
+}
+
+///Reads bitmap image, appending image to the `out` vector and returning number of bytes read on
+///success.
+///
+///Output will contain header following by RGB
+pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
+    let clipboard_data = get_clipboard_data(formats::CF_BITMAP)?;
+
+    //Thanks @matheuslessarodrigues
+    let mut bitmap = BITMAP {
+        bmType: 0,
+        bmWidth: 0,
+        bmHeight: 0,
+        bmWidthBytes: 0,
+        bmPlanes: 0,
+        bmBitsPixel: 0,
+        bmBits: ptr::null_mut(),
+    };
+
+    if unsafe { GetObjectW(clipboard_data.as_ptr(), mem::size_of::<BITMAP>() as _, &mut bitmap as *mut BITMAP as _) } == 0 {
+        return Err(SystemError::last());
+    }
+
+    let clr_bits = bitmap.bmPlanes * bitmap.bmBitsPixel;
+    let clr_bits = if clr_bits == 1 {
+        1
+    } else if clr_bits <= 4 {
+        4
+    } else if clr_bits <= 8 {
+        8
+    } else if clr_bits <= 16 {
+        16
+    } else if clr_bits <= 24 {
+        24
+    } else {
+        32
+    };
+
+    let header_storage = RawMem::new_rust_mem(if clr_bits < 24 {
+        mem::size_of::<BITMAPINFOHEADER>() + mem::size_of::<RGBQUAD>() * (1 << clr_bits)
+    } else {
+        mem::size_of::<BITMAPINFOHEADER>()
+    });
+
+    let header = unsafe {
+        &mut *(header_storage.get() as *mut BITMAPINFO)
+    };
+
+    header.bmiHeader.biSize = mem::size_of::<BITMAPINFOHEADER>() as _;
+    header.bmiHeader.biWidth = bitmap.bmWidth;
+    header.bmiHeader.biHeight = bitmap.bmHeight;
+    header.bmiHeader.biPlanes = bitmap.bmPlanes;
+    header.bmiHeader.biBitCount = bitmap.bmBitsPixel;
+    header.bmiHeader.biCompression = BI_RGB;
+    if clr_bits < 24 {
+        header.bmiHeader.biClrUsed = 1 << clr_bits;
+    }
+
+    header.bmiHeader.biSizeImage = ((((header.bmiHeader.biWidth * clr_bits + 31) & !31) / 8) * header.bmiHeader.biHeight) as _;
+    header.bmiHeader.biClrImportant = 0;
+
+    let img_size = header.bmiHeader.biSizeImage as usize;
+    let out_before = out.len();
+
+    let dc = crate::utils::Scope(unsafe { GetDC(ptr::null_mut()) }, free_dc);
+    let mut buffer = alloc::vec::Vec::new();
+    buffer.resize(img_size, 0u8);
+
+    if unsafe { GetDIBits(dc.0, clipboard_data.as_ptr() as _, 0, bitmap.bmHeight as _, buffer.as_mut_ptr() as _, header_storage.get() as _, DIB_RGB_COLORS) } == 0 {
+        return Err(SystemError::last());
+    }
+
+    //Write header
+    out.extend_from_slice(&u16::to_le_bytes(0x4d42));
+    out.extend_from_slice(&u32::to_le_bytes(mem::size_of::<BITMAPFILEHEADER>() as u32 + header.bmiHeader.biSize + header.bmiHeader.biClrUsed * mem::size_of::<RGBQUAD>() as u32 + header.bmiHeader.biSizeImage));
+    out.extend_from_slice(&u32::to_le_bytes(0)); //2 * u16 of 0
+    out.extend_from_slice(&u32::to_le_bytes(mem::size_of::<BITMAPFILEHEADER>() as u32 + header.bmiHeader.biSize + header.bmiHeader.biClrUsed * mem::size_of::<RGBQUAD>() as u32));
+
+    out.extend_from_slice(&header.bmiHeader.biSize.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biWidth.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biHeight.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biPlanes.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biBitCount.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biCompression.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biSizeImage.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biXPelsPerMeter.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biYPelsPerMeter.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biClrUsed.to_le_bytes());
+    out.extend_from_slice(&header.bmiHeader.biClrImportant.to_le_bytes());
+
+    for color in unsafe { slice::from_raw_parts(header.bmiColors.as_ptr(), header.bmiHeader.biClrUsed as _) } {
+        out.push(color.rgbBlue);
+        out.push(color.rgbGreen);
+        out.push(color.rgbRed);
+        out.push(color.rgbReserved);
+    }
+
+    out.extend_from_slice(&buffer);
+
+    Ok(out.len() - out_before)
+}
+
+///Sets bitmap (header + RGB) onto clipboard, from raw bytes.
+///
+///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
+pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
+    const FILE_HEADER_LEN: usize = mem::size_of::<BITMAPFILEHEADER>();
+    const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
+
+    if data.len() <= (FILE_HEADER_LEN + INFO_HEADER_LEN) {
+        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+    }
+
+    let mut file_header = mem::MaybeUninit::<BITMAPFILEHEADER>::uninit();
+    let mut info_header = mem::MaybeUninit::<BITMAPINFOHEADER>::uninit();
+
+    let (file_header, info_header) = unsafe {
+        ptr::copy_nonoverlapping(data.as_ptr(), file_header.as_mut_ptr() as _, FILE_HEADER_LEN);
+        ptr::copy_nonoverlapping(data.as_ptr().add(FILE_HEADER_LEN), info_header.as_mut_ptr() as _, INFO_HEADER_LEN);
+        (file_header.assume_init(), info_header.assume_init())
+    };
+
+    if data.len() <= file_header.bfOffBits as usize {
+        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+    }
+
+    let bitmap = &data[file_header.bfOffBits as _..];
+
+    if bitmap.len() < info_header.biSizeImage as usize {
+        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+    }
+
+    let dc = crate::utils::Scope(unsafe { GetDC(ptr::null_mut()) }, free_dc);
+
+    let handle = unsafe {
+        CreateDIBitmap(dc.0, &info_header as _, CBM_INIT, bitmap.as_ptr() as _, &info_header as *const _ as *const BITMAPINFO, DIB_RGB_COLORS)
+    };
+
+    if handle.is_null() {
+        return Err(SystemError::last());
+    }
+
+    let _ = empty();
+    if unsafe { SetClipboardData(formats::CF_BITMAP, handle as _).is_null() } {
+        return Err(SystemError::last());
+    }
+
+    Ok(())
 }
 
 ///Enumerator over available clipboard formats.

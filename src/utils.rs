@@ -6,8 +6,17 @@ use crate::SysResult;
 
 const GHND: winapi::ctypes::c_uint = 0x42;
 
+const BYTES_LAYOUT: alloc::alloc::Layout = alloc::alloc::Layout::new::<u8>();
+
 #[inline]
 fn noop(_: *mut c_void) {
+}
+
+#[inline]
+fn free_rust_mem(data: *mut c_void) {
+    unsafe {
+        alloc::alloc::dealloc(data as _, BYTES_LAYOUT)
+    }
 }
 
 #[inline]
@@ -18,13 +27,13 @@ fn unlock_data(data: *mut c_void) {
 }
 
 #[inline]
-fn free_mem(data: *mut c_void) {
+fn free_global_mem(data: *mut c_void) {
     unsafe {
         winapi::um::winbase::GlobalFree(data);
     }
 }
 
-pub struct Scope<T: Copy>(T, fn(T));
+pub struct Scope<T: Copy>(pub T, pub fn(T));
 
 impl<T: Copy> Drop for Scope<T> {
     #[inline(always)]
@@ -33,9 +42,18 @@ impl<T: Copy> Drop for Scope<T> {
     }
 }
 
-pub struct WinMem(Scope<*mut c_void>);
+pub struct RawMem(Scope<*mut c_void>);
 
-impl WinMem {
+impl RawMem {
+    #[inline(always)]
+    pub fn new_rust_mem(size: usize) -> Self {
+        let mem = unsafe {
+            alloc::alloc::alloc_zeroed(alloc::alloc::Layout::array::<u8>(size).expect("To create layout for bytes"))
+        };
+        debug_assert!(!mem.is_null());
+        Self(Scope(mem as _, free_rust_mem))
+    }
+
     #[inline(always)]
     pub fn new_global_mem(size: usize) -> SysResult<Self> {
         unsafe {
@@ -43,7 +61,7 @@ impl WinMem {
             if mem.is_null() {
                 Err(error_code::SystemError::last())
             } else {
-                Ok(Self(Scope(mem, free_mem)))
+                Ok(Self(Scope(mem, free_global_mem)))
             }
         }
     }

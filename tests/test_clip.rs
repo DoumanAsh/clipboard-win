@@ -1,5 +1,19 @@
 use clipboard_win::{Getter, Setter, Clipboard};
-use clipboard_win::formats::{RawData, Unicode, CF_TEXT};
+use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT};
+
+fn should_work_with_bitmap() {
+    let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+
+    let test_image_bytes = std::fs::read("tests/test-image.bmp").expect("Read test image");
+    Bitmap.write_clipboard(&test_image_bytes).expect("To set image");
+
+    let mut out = Vec::new();
+
+    assert_eq!(Bitmap.read_clipboard(&mut out).expect("To get image"), out.len());
+
+    assert_eq!(test_image_bytes.len(), out.len());
+    assert!(test_image_bytes == out);
+}
 
 fn should_work_with_string() {
     let text = "For my waifu\n!";
@@ -67,6 +81,7 @@ macro_rules! run {
 
 #[test]
 fn clipboard_should_work() {
+    run!(should_work_with_bitmap);
     run!(should_work_with_string);
     run!(should_work_with_wide_string);
     run!(should_work_with_bytes);
