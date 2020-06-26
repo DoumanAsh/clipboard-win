@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "4.0.0"
+version = "4.0.0-beta.1"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "BSL-1.0"
@@ -24,7 +24,7 @@ include = [
 default-target = "x86_64-pc-windows-msvc"
 
 [dependencies]
-lazy-bytes-cast = "5"
+#lazy-bytes-cast = "5"
 error-code = "2"
 str-buf = "1"
 
