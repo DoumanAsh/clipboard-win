@@ -5,78 +5,55 @@ clipboard-win
 [![Crates.io](https://img.shields.io/crates/v/clipboard-win.svg)](https://crates.io/crates/clipboard-win)
 [![Docs.rs](https://docs.rs/clipboard-win/badge.svg)](https://docs.rs/clipboard-win/*/x86_64-pc-windows-msvc/clipboard_win/)
 
-Provides simple way to interact with Windows clipboard.
+This crate provide simple means to operate with Windows clipboard.
+
+# Note keeping Clipboard around:
+
+In Windows [Clipboard](struct.Clipboard.html) opens globally and only one application can set data onto format at the time.
+
+Therefore as soon as operations are finished, user is advised to close [Clipboard](struct.Clipboard.html).
 
 # Clipboard
 
 All read and write access to Windows clipboard requires user to open it.
 
-For your convenience you can use [Clipboard](https://docs.rs/clipboard-win/*/x86_64-pc-windows-msvc/clipboard_win/struct.Clipboard.html) struct that opens it at creation
-and closes on its drop.
+# Usage
 
-Alternatively you can access all functionality directly through [raw module](https://docs.rs/clipboard-win/*/x86_64-pc-windows-msvc/clipboard_win/raw/index.html).
-
-Below you can find examples of usage.
-
-## Empty clipboard
+## Manually lock clipboard
 
 ```rust
-use clipboard_win::Clipboard;
+use clipboard_win::{Clipboard, formats, Getter, Setter};
 
-fn main() {
-    Clipboard::new().unwrap().empty();
-}
+const SAMPLE: &str = "MY loli sample ^^";
+
+let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+formats::Unicode.write_clipboard(&SAMPLE).expect("Write sample");
+
+let mut output = String::new();
+
+assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
+assert_eq!(output, SAMPLE);
+
+//Efficiently re-use buffer ;)
+output.clear();
+assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
+assert_eq!(output, SAMPLE);
+
+//Or take the same string twice?
+assert_eq!(formats::Unicode.read_clipboard(&mut output).expect("Read sample"), SAMPLE.len());
+assert_eq!(format!("{0}{0}", SAMPLE), output);
+
 ```
 
-## Set and get raw data
+## Simplified API
 
 ```rust
-use clipboard_win::formats;
+use clipboard_win::{formats, get_clipboard, set_clipboard};
 
-use clipboard_win::Clipboard;
+let text = "my sample ><";
 
-use std::str;
-
-fn main() {
-    let text = "For my waifu!\0"; //For text we need to pass C-like string
-    Clipboard::new().unwrap().set(formats::CF_TEXT, text.as_bytes());
-
-    let mut buffer = [0u8; 52];
-    let result = Clipboard::new().unwrap().get(formats::CF_TEXT, &mut buffer).unwrap();
-    assert_eq!(str::from_utf8(&buffer[..result]).unwrap(), text);
-}
+set_clipboard(formats::Unicode, text).expect("To set clipboard");
+//Type is necessary as string can be stored in various storages
+let result: String = get_clipboard(formats::Unicode).expect("To set clipboard");
+assert_eq!(result, text)
 ```
-
-## Set and get String
-
-```rust
-use clipboard_win::Clipboard;
-
-use std::str;
-
-fn main() {
-    let text = "For my waifu!";
-    Clipboard::new().unwrap().set_string(text);
-
-    let mut result = String::new();
-    Clipboard::new().unwrap().get_string(&mut result).unwrap();
-    assert_eq!(text, result);
-}
-```
-
-## Set and get String shortcuts
-
-```rust
-use clipboard_win::{set_clipboard_string, get_clipboard_string};
-
-use std::str;
-
-fn main() {
-    let text = "For my waifu!";
-    set_clipboard_string(text).expect("Success");
-
-    let result = get_clipboard_string().unwrap();
-    assert_eq!(text, result);
-}
-```
-

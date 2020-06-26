@@ -11,14 +11,6 @@
 //!
 //! All read and write access to Windows clipboard requires user to open it.
 //!
-//!# Error handling
-//!
-//!For simplicity sake, errors are not returned in case of failure.
-//!Due to the way winapi works, user can use [last_os_error](https://doc.rust-lang.org/std/io/struct.Error.html#method.last_os_error)
-//!to find out what's wrong.
-//!
-//!Alternatively for `no_std` environment you can use [error-code](https://crates.io/crates/error-code)
-//!
 //!# Usage
 //!
 //!## Manually lock clipboard
