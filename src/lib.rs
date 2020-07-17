@@ -7,6 +7,10 @@
 //!
 //! Therefore as soon as operations are finished, user is advised to close [Clipboard](struct.Clipboard.html).
 //!
+//!# Features
+//!
+//! - `std` - Enables usage of `std`, including `std::error::Error` trait.
+//!
 //!# Clipboard
 //!
 //! All read and write access to Windows clipboard requires user to open it.

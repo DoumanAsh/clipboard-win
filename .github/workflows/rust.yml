@@ -30,6 +30,9 @@ jobs:
         cargo --version
         rustc --version
 
+    - name: Check std
+      run: cargo check --features std
+
     - name: Test
       run: cargo test
       env:
