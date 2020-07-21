@@ -88,7 +88,7 @@ pub mod formats;
 pub mod raw;
 pub(crate) mod utils;
 
-pub use raw::{empty, seq_num, size, is_format_avail, EnumFormats};
+pub use raw::{empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
 pub use formats::Unicode;
 
 ///Alias to result used by this crate
