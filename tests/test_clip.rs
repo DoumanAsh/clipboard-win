@@ -1,5 +1,5 @@
-use clipboard_win::{Getter, Setter, Clipboard};
-use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT};
+use clipboard_win::{Getter, Setter, Clipboard, is_format_avail};
+use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP};
 
 fn should_work_with_bitmap() {
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
@@ -82,7 +82,9 @@ macro_rules! run {
 #[test]
 fn clipboard_should_work() {
     run!(should_work_with_bitmap);
+    assert!(is_format_avail(CF_BITMAP));
     run!(should_work_with_string);
+    assert!(is_format_avail(CF_UNICODETEXT));
     run!(should_work_with_wide_string);
     run!(should_work_with_bytes);
 }
