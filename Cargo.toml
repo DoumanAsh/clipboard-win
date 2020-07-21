@@ -1,6 +1,6 @@
 [package]
 name = "clipboard-win"
-version = "4.0.1"
+version = "4.0.2"
 authors = ["Douman <douman@gmx.se>"]
 description = "Provides simple way to interact with Windows clipboard."
 license = "BSL-1.0"

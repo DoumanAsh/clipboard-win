@@ -149,6 +149,6 @@ impl Getter<alloc::vec::Vec<u8>> for Bitmap {
 impl<T: AsRef<[u8]>> Setter<T> for Bitmap {
     #[inline(always)]
     fn write_clipboard(&self, data: &T) -> SysResult<()> {
-        crate::raw::set_bitamp(data.as_ref())
+        crate::raw::set_bitmap(data.as_ref())
     }
 }

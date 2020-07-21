@@ -483,10 +483,16 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(out.len() - out_before)
 }
 
+#[inline(always)]
+#[doc(hidden)]
+pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
+    set_bitmap(data)
+}
+
 ///Sets bitmap (header + RGB) onto clipboard, from raw bytes.
 ///
 ///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
-pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
+pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     const FILE_HEADER_LEN: usize = mem::size_of::<BITMAPFILEHEADER>();
     const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
 
