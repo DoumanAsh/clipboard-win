@@ -17,6 +17,28 @@
 //!
 //!# Usage
 //!
+//!## Getter
+//!
+//! Library provides various extractors from clipboard to particular format using [Getter](trait.Getter.html):
+//!
+//! - [RawData](formats/struct.RawData.html) - Reads raw bytes from specified format.
+//! - [Unicode](formats/struct.Unicode.html) - Reads unicode string from clipboard.
+//! - [Bitmap](formats/struct.Bitmap.html) - Reads RGB data of image on clipboard.
+//! - [FileList](formats/struct.FileList.html) - Reads list of files from clipboard.
+//!
+//! Depending on format, getter can extract data into various data types.
+//!
+//!## Setter
+//!
+//! Library provides various setters onto clipboard by using [Setter](trait.Setter.html):
+//!
+//! - [RawData](formats/struct.RawData.html) - Writes raw bytes onto specified format.
+//! - [Unicode](formats/struct.Unicode.html) - Writes unicode string onto clipboard.
+//! - [Bitmap](formats/struct.Bitmap.html) - Writes RGB data of image on clipboard.
+//!
+//! Default setters are generic over type allowing anything that can be referenced as byte slice or
+//! `str`
+//!
 //!## Manually lock clipboard
 //!
 //!```
