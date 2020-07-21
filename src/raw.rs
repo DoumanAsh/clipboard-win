@@ -10,7 +10,7 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData, GetDC, ReleaseDC};
+use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData, GetDC, ReleaseDC, GetClipboardOwner};
 use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::ctypes::{c_int, c_uint, c_void};
 use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
@@ -40,7 +40,7 @@ fn free_dc(data: HDC) {
     }
 }
 
-#[inline]
+#[inline(always)]
 ///Opens clipboard.
 ///
 ///Wrapper around ```OpenClipboard```.
@@ -53,7 +53,25 @@ fn free_dc(data: HDC) {
 ///
 ///* Clipboard can be accessed for read and write operations.
 pub fn open() -> SysResult<()> {
-    match unsafe { OpenClipboard(ptr::null_mut()) } {
+    open_for(ptr::null_mut())
+}
+
+#[inline]
+///Opens clipboard associating it with specified window handle.
+///
+///Unless [empty](fn.empty.html) is called, `owner` would be `None`.
+///
+///Wrapper around ```OpenClipboard```.
+///
+///# Pre-conditions:
+///
+///* Clipboard is not opened yet.
+///
+///# Post-conditions (if successful):
+///
+///* Clipboard can be accessed for read and write operations.
+pub fn open_for(owner: winapi::shared::windef::HWND) -> SysResult<()> {
+    match unsafe { OpenClipboard(owner) } {
         0 => Err(SystemError::last()),
         _ => Ok(()),
     }
@@ -746,4 +764,14 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
             register_raw_format(slice::from_raw_parts(buffer.as_ptr() as *const u16, size as usize + 1))
         }
     }
+}
+
+#[inline(always)]
+///Retrieves the window handle of the current owner of the clipboard.
+///
+///Returns `None` if clipboard is not owned.
+pub fn get_owner() -> Option<ptr::NonNull::<winapi::shared::windef::HWND__>> {
+    ptr::NonNull::new(unsafe {
+        GetClipboardOwner()
+    })
 }

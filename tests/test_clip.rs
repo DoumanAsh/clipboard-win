@@ -72,6 +72,25 @@ fn should_work_with_bytes() {
     assert_eq!(format!("{0}{0}", text), output);
 }
 
+extern "system" {
+    fn GetConsoleWindow() -> winapi::shared::windef::HWND;
+}
+
+fn should_set_owner() {
+    {
+        assert!(clipboard_win::get_owner().is_none());
+        let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+        assert!(clipboard_win::get_owner().is_none());
+    }
+
+    let console = unsafe { GetConsoleWindow() };
+    if !console.is_null() {
+        let _clip = Clipboard::new_attempts_for(console, 10).expect("Open clipboard");
+        let _ = clipboard_win::empty(); //empty is necessary to finalize association
+        assert_eq!(clipboard_win::get_owner().expect("to have owner").as_ptr() as usize, console as usize);
+    }
+}
+
 macro_rules! run {
     ($name:ident) => {
         println!("Clipboard test: {}...", stringify!($name));
@@ -87,4 +106,5 @@ fn clipboard_should_work() {
     assert!(is_format_avail(CF_UNICODETEXT));
     run!(should_work_with_wide_string);
     run!(should_work_with_bytes);
+    run!(should_set_owner);
 }

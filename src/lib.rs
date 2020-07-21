@@ -88,7 +88,7 @@ pub mod formats;
 pub mod raw;
 pub(crate) mod utils;
 
-pub use raw::{empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
+pub use raw::{get_owner, empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
 pub use formats::Unicode;
 
 ///Alias to result used by this crate
@@ -117,11 +117,23 @@ impl Clipboard {
         raw::open().map(|_| Self { _dummy: () })
     }
 
+    #[inline(always)]
+    ///Attempts to open clipboard, associating it with specified `owner` and returning clipboard instance on success.
+    pub fn new_for(owner: winapi::shared::windef::HWND) -> SysResult<Self> {
+        raw::open_for(owner).map(|_| Self { _dummy: () })
+    }
+
+    #[inline(always)]
+    ///Attempts to open clipboard, giving it `num` retries in case of failure.
+    pub fn new_attempts(num: usize) -> SysResult<Self> {
+        Self::new_attempts_for(core::ptr::null_mut(), num)
+    }
+
     #[inline]
     ///Attempts to open clipboard, giving it `num` retries in case of failure.
-    pub fn new_attempts(mut num: usize) -> SysResult<Self> {
+    pub fn new_attempts_for(owner: winapi::shared::windef::HWND, mut num: usize) -> SysResult<Self> {
         loop {
-            match Self::new() {
+            match Self::new_for(owner) {
                 Ok(this) => break Ok(this),
                 Err(err) => match num {
                     0 => break Err(err),
