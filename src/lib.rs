@@ -140,6 +140,7 @@ impl Clipboard {
                     _ => num -= 1,
                 }
             }
+            unsafe { winapi::um::processthreadsapi::SwitchToThread(); }
         }
     }
 }

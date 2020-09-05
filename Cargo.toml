@@ -41,4 +41,5 @@ features = [
     "winerror",
     "stringapiset",
     "errhandlingapi",
+    "processthreadsapi"
 ]
