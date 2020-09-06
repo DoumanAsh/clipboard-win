@@ -140,7 +140,9 @@ impl Clipboard {
                     _ => num -= 1,
                 }
             }
-            unsafe { winapi::um::processthreadsapi::SwitchToThread(); }
+
+            //0 causes to yield remaining time in scheduler, but remain to be scheduled once again.
+            unsafe { winapi::um::synchapi::Sleep(0) };
         }
     }
 }
