@@ -91,6 +91,7 @@ pub(crate) mod utils;
 pub use raw::{get_owner, empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
 pub use formats::Unicode;
 
+pub use error_code::SystemError;
 ///Alias to result used by this crate
 pub type SysResult<T> = Result<T, error_code::SystemError>;
 
