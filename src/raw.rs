@@ -613,7 +613,7 @@ macro_rules! match_format_name_big {
 macro_rules! match_format_name {
     ( $name:expr, $( $f:ident ),* ) => {
         use core::fmt::Write;
-        let mut result = StrBuf::<52>::new();
+        let mut result = StrBuf::<[u8; 52]>::new();
 
         match $name {
             $( formats::$f => {
@@ -654,7 +654,7 @@ macro_rules! match_format_name {
 ///
 ///* ```Some``` Name of valid format.
 ///* ```None``` Format is invalid or doesn't exist.
-pub fn format_name(format: u32) -> Option<StrBuf<52>> {
+pub fn format_name(format: u32) -> Option<StrBuf<[u8; 52]>> {
     match_format_name!(format,
                        CF_BITMAP,
                        CF_DIB,
