@@ -259,8 +259,18 @@ pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(result)
 }
 
-///Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
+/// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
+///
+/// This function empties the clipboard before setting the data.
 pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
+    let _ = empty();
+    set_without_clear(format, data)
+}
+
+/// Copies raw bytes onto the clipboard with the specified `format`, returning whether it was successful.
+///
+/// This function does not empty the clipboard before setting the data.
+pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
     let size = data.len();
     debug_assert!(size > 0);
 
@@ -270,8 +280,6 @@ pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
         let (ptr, _lock) = mem.lock()?;
         unsafe { ptr::copy_nonoverlapping(data.as_ptr(), ptr.as_ptr() as _, size) };
     }
-
-    let _ = empty();
 
     if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
         //SetClipboardData takes ownership
