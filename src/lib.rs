@@ -82,6 +82,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 
+#[cfg(feature = "std")]
+extern crate std;
+
 extern crate alloc;
 
 pub mod formats;
