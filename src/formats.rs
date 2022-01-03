@@ -134,6 +134,14 @@ impl Getter<alloc::vec::Vec<alloc::string::String>> for FileList {
     }
 }
 
+#[cfg(feature = "std")]
+impl Getter<alloc::vec::Vec<std::path::PathBuf>> for FileList {
+    #[inline(always)]
+    fn read_clipboard(&self, out: &mut alloc::vec::Vec<std::path::PathBuf>) -> SysResult<usize> {
+        crate::raw::get_file_list_path(out)
+    }
+}
+
 ///Format for bitmap images i.e. `CF_BITMAP`.
 ///
 ///Both `Getter` and `Setter` expects image as header and rgb payload

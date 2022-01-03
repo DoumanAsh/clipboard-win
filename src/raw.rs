@@ -355,6 +355,47 @@ pub fn set_string(data: &str) -> SysResult<()> {
     Err(error_code::SystemError::last())
 }
 
+#[cfg(feature = "std")]
+///Retrieves file list from clipboard, appending each element to the provided storage.
+///
+///Returns number of appended file names.
+pub fn get_file_list_path(out: &mut alloc::vec::Vec<std::path::PathBuf>) -> SysResult<usize> {
+    use std::os::windows::ffi::OsStringExt;
+
+    let clipboard_data = RawMem::from_borrowed(get_clipboard_data(formats::CF_HDROP)?);
+
+    let (_data_ptr, _lock) = clipboard_data.lock()?;
+
+    let num_files = unsafe { DragQueryFileW(clipboard_data.get() as _, u32::MAX, ptr::null_mut(), 0) };
+    out.reserve(num_files as usize);
+
+    let mut buffer = alloc::vec::Vec::new();
+
+    for idx in 0..num_files {
+        let required_size_no_null = unsafe { DragQueryFileW(clipboard_data.get() as _, idx, ptr::null_mut(), 0) };
+        if required_size_no_null == 0 {
+            return Err(SystemError::last());
+        }
+
+        let required_size = required_size_no_null + 1;
+        buffer.reserve(required_size as usize);
+
+        if unsafe { DragQueryFileW(clipboard_data.get() as _, idx, buffer.as_mut_ptr(), required_size) == 0 } {
+            return Err(SystemError::last());
+        }
+
+        unsafe {
+            buffer.set_len(required_size_no_null as usize);
+        }
+        //This fucking abomination of API requires double allocation,
+        //just because no one had brain for to provide API for creation OsString out of owned
+        //Vec<16>
+        out.push(std::ffi::OsString::from_wide(&buffer).into())
+    }
+
+    Ok(num_files as usize)
+}
+
 ///Retrieves file list from clipboard, appending each element to the provided storage.
 ///
 ///Returns number of appended file names.
