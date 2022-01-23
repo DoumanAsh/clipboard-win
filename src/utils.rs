@@ -1,12 +1,25 @@
 use core::{mem, ptr};
 
 use winapi::ctypes::c_void;
+use error_code::SystemError;
 
 use crate::SysResult;
 
 const GHND: winapi::ctypes::c_uint = 0x42;
 
 const BYTES_LAYOUT: alloc::alloc::Layout = alloc::alloc::Layout::new::<u8>();
+
+#[cold]
+#[inline(never)]
+pub fn unlikely_empty_size_result<T: Default>() -> T {
+    Default::default()
+}
+
+#[cold]
+#[inline(never)]
+pub fn unlikely_last_error() -> SystemError {
+    SystemError::last()
+}
 
 #[inline]
 fn noop(_: *mut c_void) {
@@ -46,12 +59,16 @@ pub struct RawMem(Scope<*mut c_void>);
 
 impl RawMem {
     #[inline(always)]
-    pub fn new_rust_mem(size: usize) -> Self {
+    pub fn new_rust_mem(size: usize) -> SysResult<Self> {
         let mem = unsafe {
             alloc::alloc::alloc_zeroed(alloc::alloc::Layout::array::<u8>(size).expect("To create layout for bytes"))
         };
-        debug_assert!(!mem.is_null());
-        Self(Scope(mem as _, free_rust_mem))
+
+        if mem.is_null() {
+            Err(unlikely_last_error())
+        } else {
+            Ok(Self(Scope(mem as _, free_rust_mem)))
+        }
     }
 
     #[inline(always)]
@@ -59,7 +76,7 @@ impl RawMem {
         unsafe {
             let mem = winapi::um::winbase::GlobalAlloc(GHND, size as _);
             if mem.is_null() {
-                Err(error_code::SystemError::last())
+                Err(unlikely_last_error())
             } else {
                 Ok(Self(Scope(mem, free_global_mem)))
             }

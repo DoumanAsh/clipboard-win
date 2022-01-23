@@ -31,7 +31,7 @@ use alloc::borrow::ToOwned;
 use alloc::format;
 
 use crate::{SysResult, formats};
-use crate::utils::{RawMem};
+use crate::utils::{unlikely_empty_size_result, RawMem};
 
 #[inline(always)]
 fn free_dc(data: HDC) {
@@ -221,7 +221,9 @@ pub fn count_formats() -> Option<usize> {
 ///It is safe to pass uninit memory
 pub fn get(format: u32, out: &mut [u8]) -> SysResult<usize> {
     let size = out.len();
-    debug_assert!(size > 0);
+    if size == 0 {
+        return Ok(unlikely_empty_size_result());
+    }
     let out_ptr = out.as_mut_ptr();
 
     let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
@@ -272,7 +274,9 @@ pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
 /// This function does not empty the clipboard before setting the data.
 pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
     let size = data.len();
-    debug_assert!(size > 0);
+    if size == 0 {
+        return Ok(unlikely_empty_size_result());
+    }
 
     let mem = RawMem::new_global_mem(size)?;
 
@@ -326,7 +330,9 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
 ///Copies unicode string onto clipboard, performing necessary conversions, returning true on
 ///success.
 pub fn set_string(data: &str) -> SysResult<()> {
-    debug_assert!(data.len() > 0);
+    if data.is_empty() {
+        return Ok(unlikely_empty_size_result());
+    }
 
     let size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
@@ -472,7 +478,7 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
         mem::size_of::<BITMAPINFOHEADER>() + mem::size_of::<RGBQUAD>() * (1 << clr_bits)
     } else {
         mem::size_of::<BITMAPINFOHEADER>()
-    });
+    })?;
 
     let header = unsafe {
         &mut *(header_storage.get() as *mut BITMAPINFO)
@@ -775,9 +781,12 @@ pub fn format_name_big(format: u32) -> Option<String> {
 ///
 ///# Note:
 ///
-///Custom format identifier is in range `0xC000...0xFFFF`.
+///- Custom format identifier is in range `0xC000...0xFFFF`.
+///- Function fails if input is not null terminated string.
 pub unsafe fn register_raw_format(name: &[u16]) -> Option<NonZeroU32> {
-    debug_assert_eq!(name[name.len()-1], b'\0' as u16);
+    if name[name.len()-1] != b'\0' as u16 {
+        return unlikely_empty_size_result()
+    }
     NonZeroU32::new(RegisterClipboardFormatW(name.as_ptr()) )
 }
 
