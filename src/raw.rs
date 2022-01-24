@@ -784,7 +784,7 @@ pub fn format_name_big(format: u32) -> Option<String> {
 ///- Custom format identifier is in range `0xC000...0xFFFF`.
 ///- Function fails if input is not null terminated string.
 pub unsafe fn register_raw_format(name: &[u16]) -> Option<NonZeroU32> {
-    if name[name.len()-1] != b'\0' as u16 {
+    if name.is_empty() || name[name.len()-1] != b'\0' as u16 {
         return unlikely_empty_size_result()
     }
     NonZeroU32::new(RegisterClipboardFormatW(name.as_ptr()) )
@@ -805,7 +805,7 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
     };
 
     if size == 0 {
-        return None;
+        return unlikely_empty_size_result()
     }
 
     if size > 52 {
