@@ -72,6 +72,19 @@ fn should_work_with_bytes() {
     assert_eq!(format!("{0}{0}", text), output);
 }
 
+fn should_work_with_set_empty_string() {
+    let text = "";
+
+    let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+
+    Unicode.write_clipboard(&text).expect("Write text");
+
+    let mut output = String::new();
+
+    assert_eq!(Unicode.read_clipboard(&mut output).expect("Read text"), text.len());
+    assert_eq!(text, output);
+}
+
 extern "system" {
     fn GetConsoleWindow() -> winapi::shared::windef::HWND;
 }
@@ -106,5 +119,6 @@ fn clipboard_should_work() {
     assert!(is_format_avail(CF_UNICODETEXT));
     run!(should_work_with_wide_string);
     run!(should_work_with_bytes);
+    run!(should_work_with_set_empty_string);
     run!(should_set_owner);
 }
