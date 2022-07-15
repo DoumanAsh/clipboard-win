@@ -56,6 +56,8 @@ pub fn open() -> SysResult<()> {
     open_for(ptr::null_mut())
 }
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+//clippy is retard
 #[inline]
 ///Opens clipboard associating it with specified window handle.
 ///
@@ -275,6 +277,7 @@ pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
 pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
     let size = data.len();
     if size == 0 {
+        #[allow(clippy::unit_arg)]
         return Ok(unlikely_empty_size_result());
     }
 
@@ -330,15 +333,12 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
 ///Copies unicode string onto clipboard, performing necessary conversions, returning true on
 ///success.
 pub fn set_string(data: &str) -> SysResult<()> {
-    if data.is_empty() {
-        return Ok(unlikely_empty_size_result());
-    }
-
     let size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
     };
 
-    if size != 0 {
+    //MultiByteToWideChar fails on empty input, but we can ignore it and just set buffer with null char
+    if size != 0 || data.is_empty() {
         let mem = RawMem::new_global_mem((mem::size_of::<u16>() * (size as usize + 1)) as _)?;
         {
             let (ptr, _lock) = mem.lock()?;
