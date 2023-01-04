@@ -592,6 +592,52 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     Ok(())
 }
 
+
+///Set files to clipboard.
+pub fn set_file_list(paths: &str) -> SysResult<()> {
+    let final_str = paths;
+    let files_bytes: Vec<u16> = final_str.encode_utf16().collect();
+    let dropfiles_size = std::mem::size_of::<windows::Win32::UI::Shell::DROPFILES>() as u32;
+    // It seems files_bytes.len()*2 is valid, even for characters that span four bytes (as opposed
+    // to two bytes for, e.g., an ASCII character).
+    let path_size = files_bytes.len() * 2;
+    let dropfiles = windows::Win32::UI::Shell::DROPFILES {
+        pFiles: dropfiles_size,
+        pt: windows::Win32::Foundation::POINT { x: 100, y: 100 },
+        fNC: windows::Win32::Foundation::BOOL(0),
+        fWide: windows::Win32::Foundation::BOOL(1),
+    };
+    let mem = crate::utils::RawMem::new_global_mem((dropfiles_size + (path_size as u32)) as usize).unwrap();
+    {
+        let (ptr, _lock) = mem.lock().unwrap();
+        unsafe {
+            println!("{:?}", &dropfiles as *const _);
+            println!("{:?}", files_bytes.as_ptr());
+            println!("{:?}", ptr.as_ptr());
+            println!("{:?}", dropfiles_size as usize);
+            println!("{:?}", ptr.as_ptr().offset(dropfiles_size as isize));
+            println!("{:?}", path_size);
+            ptr::copy_nonoverlapping(
+                &dropfiles as *const _,
+                ptr.as_ptr() as _,
+                dropfiles_size as usize,
+            );
+            ptr::copy_nonoverlapping(
+                files_bytes.as_ptr(),
+                (ptr.as_ptr().offset(dropfiles_size as isize)) as _,
+                path_size,
+            );
+        }
+    }
+    if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
+        //SetClipboardData now has ownership of `mem`.
+        mem.release();
+        return Ok(());
+    }
+    return Err(error_code::SystemError::last());
+}
+
+
 ///Enumerator over available clipboard formats.
 ///
 ///# Pre-conditions:

@@ -78,7 +78,7 @@
 //!assert_eq!(result, text)
 //!```
 
-#![no_std]
+// #![no_std]
 #![warn(missing_docs)]
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::style))]
 

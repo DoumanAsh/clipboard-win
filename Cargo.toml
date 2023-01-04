@@ -26,9 +26,10 @@ default-target = "x86_64-pc-windows-msvc"
 [target.'cfg(windows)'.dependencies]
 error-code = "2.1"
 str-buf = "1"
+windows = { version = "0.43.0", features = ["Win32_UI_Shell", "Win32_Foundation"] }
 
-[features]
-std = ["error-code/std"]
+# [features]
+# std = ["error-code/std"]
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3"
