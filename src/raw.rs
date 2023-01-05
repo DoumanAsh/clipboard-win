@@ -609,14 +609,20 @@ pub fn set_file_list(file_list: &str) -> SysResult<()> {
     let file_list_size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr::null_mut(), 0)
     };
+
+    if file_list_size == 0 {
+        return Err(error_code::SystemError::last());
+    }
+
     let dropfiles = DROPFILES {
         p_files: DROPFILES_SIZE,
-        pt: POINT { x: 100, y: 100 },
+        pt: POINT { x: 0, y: 0 },
         f_nc: 0,
         f_wide: 1,
     };
 
-    let mem = crate::utils::RawMem::new_global_mem(DROPFILES_SIZE as usize + file_list_size as usize + 1).unwrap();
+    let mem_size = DROPFILES_SIZE as usize + (file_list_size as usize * 2) + 4; //4 for 2 wide null characters
+    let mem = crate::utils::RawMem::new_global_mem(mem_size)?;
     {
         let (ptr, _lock) = mem.lock()?;
         let ptr = ptr.as_ptr() as *mut u8;
@@ -627,8 +633,12 @@ pub fn set_file_list(file_list: &str) -> SysResult<()> {
             MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr, file_list_size);
             //null-terminate string
             ptr.offset(file_list_size as isize).write(0);
+            ptr.offset(file_list_size as isize + 1).write(0);
         }
     }
+
+    let _ = empty();
+
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
         mem.release();

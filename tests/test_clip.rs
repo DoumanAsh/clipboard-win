@@ -1,21 +1,14 @@
 use clipboard_win::{Getter, Setter, Clipboard, is_format_avail};
-use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList};
+use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList, CF_HDROP};
 
-#[test]
-fn should_work_with_filelist() {
-    // cargo test --features std should_work_with_filelist -- --exact --nocapture
-    // https://stackoverflow.com/questions/54585804/how-to-run-a-specific-unit-test-in-rust
-    // https://github.com/DoumanAsh/clipboard-win/issues/10
-
+fn should_set_file_list() {
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+    let path = std::fs::canonicalize("tests/test-image.bmp").expect("to get abs path").display().to_string();
+    FileList.write_clipboard(&path).expect("set file to copy");
 
-    let vec1 = vec!["C:/sandbox/0normal.abc"];
-    // let vec2 = vec!["C:/sandbox/0 acdt_json2.json.abc"];
-
-    let mut paths_joined = vec1.join("\x00");
-    paths_joined.push_str("\x00\x00");
-
-    FileList.write_clipboard(&paths_joined).expect("write paths");
+    let mut set_files = Vec::<String>::with_capacity(1);
+    FileList.read_clipboard(&mut set_files).expect("read");
+    assert_eq!(set_files, [path]);
 }
 
 fn should_work_with_bitmap() {
@@ -134,6 +127,8 @@ fn clipboard_should_work() {
     assert!(is_format_avail(CF_BITMAP));
     run!(should_work_with_string);
     assert!(is_format_avail(CF_UNICODETEXT));
+    run!(should_set_file_list);
+    assert!(is_format_avail(CF_HDROP));
     run!(should_work_with_wide_string);
     run!(should_work_with_bytes);
     run!(should_work_with_set_empty_string);
