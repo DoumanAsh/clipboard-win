@@ -15,10 +15,11 @@ use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::ctypes::{c_int, c_uint, c_void};
 use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
 use winapi::um::winnls::CP_UTF8;
-use winapi::um::shellapi::{DragQueryFileW};
+use winapi::um::shellapi::DragQueryFileW;
 use winapi::um::wingdi::{GetObjectW, GetDIBits, CreateDIBitmap, BITMAP, BITMAPINFO, BITMAPINFOHEADER, RGBQUAD, BI_RGB, DIB_RGB_COLORS, BITMAPFILEHEADER, CBM_INIT};
-use winapi::shared::windef::{HDC};
+use winapi::shared::windef::HDC;
 use winapi::shared::winerror::ERROR_INCORRECT_SIZE;
+use winapi::shared::minwindef::DWORD;
 
 use str_buf::StrBuf;
 use error_code::SystemError;
@@ -594,39 +595,38 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 
 
 ///Set files to clipboard.
-pub fn set_file_list(paths: &str) -> SysResult<()> {
-    let final_str = paths;
-    let files_bytes: Vec<u16> = final_str.encode_utf16().collect();
-    let dropfiles_size = std::mem::size_of::<windows::Win32::UI::Shell::DROPFILES>() as u32;
-    // It seems files_bytes.len()*2 is valid, even for characters that span four bytes (as opposed
-    // to two bytes for, e.g., an ASCII character).
-    let path_size = files_bytes.len() * 2;
-    let dropfiles = windows::Win32::UI::Shell::DROPFILES {
-        pFiles: dropfiles_size,
-        pt: windows::Win32::Foundation::POINT { x: 100, y: 100 },
-        fNC: windows::Win32::Foundation::BOOL(0),
-        fWide: windows::Win32::Foundation::BOOL(1),
+pub fn set_file_list(file_list: &str) -> SysResult<()> {
+    use winapi::shared::windef::POINT;
+    #[repr(C, packed(1))]
+    pub struct DROPFILES {
+        pub p_files: u32,
+        pub pt: POINT,
+        pub f_nc: c_int,
+        pub f_wide: c_int,
+    }
+    const DROPFILES_SIZE: DWORD = core::mem::size_of::<DROPFILES>() as DWORD;
+
+    let file_list_size = unsafe {
+        MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr::null_mut(), 0)
     };
-    let mem = crate::utils::RawMem::new_global_mem((dropfiles_size + (path_size as u32)) as usize).unwrap();
+    let dropfiles = DROPFILES {
+        p_files: DROPFILES_SIZE,
+        pt: POINT { x: 100, y: 100 },
+        f_nc: 0,
+        f_wide: 1,
+    };
+
+    let mem = crate::utils::RawMem::new_global_mem(DROPFILES_SIZE as usize + file_list_size as usize + 1).unwrap();
     {
-        let (ptr, _lock) = mem.lock().unwrap();
+        let (ptr, _lock) = mem.lock()?;
+        let ptr = ptr.as_ptr() as *mut u8;
         unsafe {
-            println!("{:?}", &dropfiles as *const _);
-            println!("{:?}", files_bytes.as_ptr());
-            println!("{:?}", ptr.as_ptr());
-            println!("{:?}", dropfiles_size as usize);
-            println!("{:?}", ptr.as_ptr().offset(dropfiles_size as isize));
-            println!("{:?}", path_size);
-            ptr::copy_nonoverlapping(
-                &dropfiles as *const _,
-                ptr.as_ptr() as _,
-                dropfiles_size as usize,
-            );
-            ptr::copy_nonoverlapping(
-                files_bytes.as_ptr(),
-                (ptr.as_ptr().offset(dropfiles_size as isize)) as _,
-                path_size,
-            );
+            (ptr as *mut DROPFILES).write(dropfiles);
+
+            let ptr = ptr.add(DROPFILES_SIZE as usize) as *mut u16;
+            MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr, file_list_size);
+            //null-terminate string
+            ptr.offset(file_list_size as isize).write(0);
         }
     }
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
