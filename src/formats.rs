@@ -142,7 +142,7 @@ impl Getter<alloc::vec::Vec<std::path::PathBuf>> for FileList {
     }
 }
 
-impl<T: AsRef<str>> Setter<T> for FileList {
+impl<T: AsRef<[alloc::string::String]>> Setter<T> for FileList {
     #[inline(always)]
     fn write_clipboard(&self, data: &T) -> SysResult<()> {
         crate::raw::set_file_list(data.as_ref())

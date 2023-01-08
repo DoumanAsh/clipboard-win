@@ -3,12 +3,18 @@ use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, 
 
 fn should_set_file_list() {
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
-    let path = std::fs::canonicalize("tests/test-image.bmp").expect("to get abs path").display().to_string();
-    FileList.write_clipboard(&path).expect("set file to copy");
+    // Note that you will not be able to paste the paths below in Windows Explorer because Explorer
+    // does not play nice with canonicalize: https://github.com/rust-lang/rust/issues/42869.
+    // Pasting in Explorer works fine with regular, non-UNC paths.
+    let paths = vec![
+        std::fs::canonicalize("tests/test-image.bmp").expect("to get abs path").display().to_string(),
+        std::fs::canonicalize("tests/formats.rs").expect("to get abs path").display().to_string(),
+    ];
+    FileList.write_clipboard(&paths).expect("set file to copy");
 
-    let mut set_files = Vec::<String>::with_capacity(1);
+    let mut set_files = Vec::<String>::with_capacity(2);
     FileList.read_clipboard(&mut set_files).expect("read");
-    assert_eq!(set_files, [path]);
+    assert_eq!(set_files, paths);
 }
 
 fn should_work_with_bitmap() {

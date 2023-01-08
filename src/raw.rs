@@ -595,7 +595,9 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 
 
 ///Set files to clipboard.
-pub fn set_file_list(file_list: &str) -> SysResult<()> {
+pub fn set_file_list(paths: &[String]) -> SysResult<()> {
+    let file_list = paths.join("\x00");
+
     use winapi::shared::windef::POINT;
     #[repr(C, packed(1))]
     pub struct DROPFILES {
