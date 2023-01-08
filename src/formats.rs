@@ -142,6 +142,13 @@ impl Getter<alloc::vec::Vec<std::path::PathBuf>> for FileList {
     }
 }
 
+impl<T: AsRef<str>> Setter<[T]> for FileList {
+    #[inline(always)]
+    fn write_clipboard(&self, data: &[T]) -> SysResult<()> {
+        crate::raw::set_file_list(data)
+    }
+}
+
 ///Format for bitmap images i.e. `CF_BITMAP`.
 ///
 ///Both `Getter` and `Setter` expects image as header and rgb payload

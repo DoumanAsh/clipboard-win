@@ -15,10 +15,11 @@ use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
 use winapi::ctypes::{c_int, c_uint, c_void};
 use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
 use winapi::um::winnls::CP_UTF8;
-use winapi::um::shellapi::{DragQueryFileW};
+use winapi::um::shellapi::DragQueryFileW;
 use winapi::um::wingdi::{GetObjectW, GetDIBits, CreateDIBitmap, BITMAP, BITMAPINFO, BITMAPINFOHEADER, RGBQUAD, BI_RGB, DIB_RGB_COLORS, BITMAPFILEHEADER, CBM_INIT};
-use winapi::shared::windef::{HDC};
+use winapi::shared::windef::HDC;
 use winapi::shared::winerror::ERROR_INCORRECT_SIZE;
+use winapi::shared::minwindef::DWORD;
 
 use str_buf::StrBuf;
 use error_code::SystemError;
@@ -591,6 +592,74 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 
     Ok(())
 }
+
+
+///Set list of file paths to clipboard.
+pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
+    use winapi::shared::windef::POINT;
+    #[repr(C, packed(1))]
+    pub struct DROPFILES {
+        pub p_files: u32,
+        pub pt: POINT,
+        pub f_nc: c_int,
+        pub f_wide: c_int,
+    }
+    const DROPFILES_SIZE: DWORD = core::mem::size_of::<DROPFILES>() as DWORD;
+
+    let mut file_list_size = 0;
+    for path in paths {
+        let path = path.as_ref();
+        unsafe {
+            //+1 for null char
+            file_list_size += MultiByteToWideChar(CP_UTF8, 0, path.as_ptr() as *const _, path.len() as _, ptr::null_mut(), 0) + 1
+        }
+    }
+
+    if file_list_size == 0 {
+        return Err(error_code::SystemError::last());
+    }
+
+    let dropfiles = DROPFILES {
+        p_files: DROPFILES_SIZE,
+        pt: POINT { x: 0, y: 0 },
+        f_nc: 0,
+        f_wide: 1,
+    };
+
+    let mem_size = DROPFILES_SIZE as usize + (file_list_size as usize * 2) + 2; //+2 for final null char
+    let mem = crate::utils::RawMem::new_global_mem(mem_size)?;
+    {
+        let (ptr, _lock) = mem.lock()?;
+        let ptr = ptr.as_ptr() as *mut u8;
+        unsafe {
+            (ptr as *mut DROPFILES).write(dropfiles);
+
+            let mut ptr = ptr.add(DROPFILES_SIZE as usize) as *mut u16;
+            for path in paths {
+                let path = path.as_ref();
+                let written = MultiByteToWideChar(CP_UTF8, 0, path.as_ptr() as *const _, path.len() as _, ptr, file_list_size);
+                ptr = ptr.offset(written as isize);
+                //Add null termination character
+                ptr.write(0);
+                ptr = ptr.add(1);
+                file_list_size -= written - 1;
+            }
+            //Add final null termination, to indicate end of list
+            //null-terminate string
+            ptr.write(0);
+        }
+    }
+
+    let _ = empty();
+
+    if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
+        //SetClipboardData now has ownership of `mem`.
+        mem.release();
+        return Ok(());
+    }
+    return Err(error_code::SystemError::last());
+}
+
 
 ///Enumerator over available clipboard formats.
 ///
