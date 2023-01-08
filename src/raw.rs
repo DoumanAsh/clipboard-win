@@ -594,10 +594,8 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 }
 
 
-///Set files to clipboard.
-pub fn set_file_list(paths: &[String]) -> SysResult<()> {
-    let file_list = paths.join("\x00");
-
+///Set list of file paths to clipboard.
+pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
     use winapi::shared::windef::POINT;
     #[repr(C, packed(1))]
     pub struct DROPFILES {
@@ -608,9 +606,14 @@ pub fn set_file_list(paths: &[String]) -> SysResult<()> {
     }
     const DROPFILES_SIZE: DWORD = core::mem::size_of::<DROPFILES>() as DWORD;
 
-    let file_list_size = unsafe {
-        MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr::null_mut(), 0)
-    };
+    let mut file_list_size = 0;
+    for path in paths {
+        let path = path.as_ref();
+        unsafe {
+            //+1 for null char
+            file_list_size += MultiByteToWideChar(CP_UTF8, 0, path.as_ptr() as *const _, path.len() as _, ptr::null_mut(), 0) + 1
+        }
+    }
 
     if file_list_size == 0 {
         return Err(error_code::SystemError::last());
@@ -623,7 +626,7 @@ pub fn set_file_list(paths: &[String]) -> SysResult<()> {
         f_wide: 1,
     };
 
-    let mem_size = DROPFILES_SIZE as usize + (file_list_size as usize * 2) + 4; //4 for 2 wide null characters
+    let mem_size = DROPFILES_SIZE as usize + (file_list_size as usize * 2) + 2; //+2 for final null char
     let mem = crate::utils::RawMem::new_global_mem(mem_size)?;
     {
         let (ptr, _lock) = mem.lock()?;
@@ -631,11 +634,19 @@ pub fn set_file_list(paths: &[String]) -> SysResult<()> {
         unsafe {
             (ptr as *mut DROPFILES).write(dropfiles);
 
-            let ptr = ptr.add(DROPFILES_SIZE as usize) as *mut u16;
-            MultiByteToWideChar(CP_UTF8, 0, file_list.as_ptr() as *const _, file_list.len() as _, ptr, file_list_size);
+            let mut ptr = ptr.add(DROPFILES_SIZE as usize) as *mut u16;
+            for path in paths {
+                let path = path.as_ref();
+                let written = MultiByteToWideChar(CP_UTF8, 0, path.as_ptr() as *const _, path.len() as _, ptr, file_list_size);
+                ptr = ptr.offset(written as isize);
+                //Add null termination character
+                ptr.write(0);
+                ptr = ptr.add(1);
+                file_list_size -= written - 1;
+            }
+            //Add final null termination, to indicate end of list
             //null-terminate string
-            ptr.offset(file_list_size as isize).write(0);
-            ptr.offset(file_list_size as isize + 1).write(0);
+            ptr.write(0);
         }
     }
 

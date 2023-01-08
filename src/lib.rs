@@ -168,7 +168,7 @@ pub trait Getter<Type> {
 ///Describes format setter, specifying data type as type param
 ///
 ///Default implementations only perform write, without opening/closing clipboard
-pub trait Setter<Type> {
+pub trait Setter<Type: ?Sized> {
     ///Writes content of `data` onto clipboard, returning whether it was successful or not
     fn write_clipboard(&self, data: &Type) -> SysResult<()>;
 }

@@ -6,7 +6,7 @@ fn should_set_file_list() {
     // Note that you will not be able to paste the paths below in Windows Explorer because Explorer
     // does not play nice with canonicalize: https://github.com/rust-lang/rust/issues/42869.
     // Pasting in Explorer works fine with regular, non-UNC paths.
-    let paths = vec![
+    let paths = [
         std::fs::canonicalize("tests/test-image.bmp").expect("to get abs path").display().to_string(),
         std::fs::canonicalize("tests/formats.rs").expect("to get abs path").display().to_string(),
     ];
