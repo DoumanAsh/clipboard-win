@@ -1,4 +1,4 @@
-use clipboard_win::{Getter, Setter, Clipboard, is_format_avail};
+use clipboard_win::{Getter, Setter, Clipboard, is_format_avail, types};
 use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList, CF_HDROP};
 
 fn should_set_file_list() {
@@ -102,7 +102,7 @@ fn should_work_with_set_empty_string() {
 }
 
 extern "system" {
-    fn GetConsoleWindow() -> winapi::shared::windef::HWND;
+    fn GetConsoleWindow() -> types::HWND;
 }
 
 fn should_set_owner() {

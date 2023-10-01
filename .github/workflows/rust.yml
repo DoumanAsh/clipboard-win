@@ -37,3 +37,10 @@ jobs:
       run: cargo test
       env:
         RUST_TEST_THREADS: 1
+
+    - name: Test x86
+      run: |
+        rustup target add i686-pc-windows-msvc
+        cargo test --target i686-pc-windows-msvc
+      env:
+        RUST_TEST_THREADS: 1
