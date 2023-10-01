@@ -12,6 +12,7 @@
 
 use crate::types::*;
 use crate::sys::*;
+use crate::utils::Buffer;
 
 const CBM_INIT: DWORD = 0x04;
 const BI_RGB: DWORD = 0;
@@ -19,7 +20,6 @@ const DIB_RGB_COLORS: DWORD = 0;
 const ERROR_INCORRECT_SIZE: DWORD = 1462;
 const CP_UTF8: DWORD = 65001;
 
-use str_buf::StrBuf;
 use error_code::ErrorCode;
 
 use core::{slice, mem, ptr, cmp};
@@ -719,9 +719,9 @@ macro_rules! match_format_name_big {
             formats::CF_GDIOBJFIRST ..= formats::CF_GDIOBJLAST => Some(format!("CF_GDIOBJ{}", $name - formats::CF_GDIOBJFIRST)),
             formats::CF_PRIVATEFIRST ..= formats::CF_PRIVATELAST => Some(format!("CF_PRIVATE{}", $name - formats::CF_PRIVATEFIRST)),
             _ => {
-                let format_buff = [0u16; 256];
+                let mut format_buff = [0u16; 256];
                 unsafe {
-                    let buff_p = format_buff.as_ptr() as *mut u16;
+                    let buff_p = format_buff.as_mut_ptr() as *mut u16;
 
                     match GetClipboardFormatNameW($name, buff_p, format_buff.len() as c_int) {
                         0 => None,
@@ -734,36 +734,35 @@ macro_rules! match_format_name_big {
 }
 
 macro_rules! match_format_name {
-    ( $name:expr, $( $f:ident ),* ) => {
+    ( $name:expr => $out:ident, $( $f:ident ),* ) => {
         use core::fmt::Write;
-        let mut result = StrBuf::<[u8; 52]>::new();
 
         match $name {
             $( formats::$f => {
-                let _ = result.push_str(stringify!($f));
+                let _ = $out.push_str(stringify!($f));
             },)*
             formats::CF_GDIOBJFIRST ..= formats::CF_GDIOBJLAST => {
-                let _ = write!(result, "CF_GDIOBJ{}", $name - formats::CF_GDIOBJFIRST);
+                let _ = write!($out, "CF_GDIOBJ{}", $name - formats::CF_GDIOBJFIRST);
             },
             formats::CF_PRIVATEFIRST ..= formats::CF_PRIVATELAST => {
-                let _ = write!(result, "CF_PRIVATE{}", $name - formats::CF_PRIVATEFIRST);
+                let _ = write!($out, "CF_PRIVATE{}", $name - formats::CF_PRIVATEFIRST);
             },
             _ => {
-                let mut format_buff = [0u16; 52];
+                let mut format_buff = [0u16; 256];
                 unsafe {
                     let buff_p = format_buff.as_mut_ptr() as *mut u16;
                     match GetClipboardFormatNameW($name, buff_p, format_buff.len() as c_int) {
                         0 => return None,
-                        len => match WideCharToMultiByte(CP_UTF8, 0, format_buff.as_ptr(), len, result.as_ptr() as *mut i8, result.remaining() as i32, ptr::null(), ptr::null_mut()) {
+                        len => match WideCharToMultiByte(CP_UTF8, 0, format_buff.as_ptr(), len, $out.as_mut_ptr() as *mut i8, $out.remaining() as i32, ptr::null(), ptr::null_mut()) {
                             0 => return None,
-                            len => result.set_len(len as u8),
+                            len => $out.set_len(len as _),
                         }
                     }
                 }
             }
         }
 
-        return Some(result)
+        return $out.as_str()
     }
 }
 
@@ -771,14 +770,15 @@ macro_rules! match_format_name {
 ///
 ///# Parameters:
 ///
-///* ```format``` clipboard format code.
+///* ```format``` - clipboard format code.
+///* ```out``` - temporary buffer to hold text. Buffer can be created from `&mut [u8]` and `&mut [core::mem::MaybeUninit<u8>]`
 ///
 ///# Return result:
 ///
 ///* ```Some``` Name of valid format.
-///* ```None``` Format is invalid or doesn't exist.
-pub fn format_name(format: u32) -> Option<StrBuf<[u8; 52]>> {
-    match_format_name!(format,
+///* ```None``` Format is invalid or doesn't exist or overflow happened on custom name.
+pub fn format_name(format: u32, mut out: Buffer<'_>) -> Option<&'_ str> {
+    match_format_name!(format => out,
                        CF_BITMAP,
                        CF_DIB,
                        CF_DIBV5,
