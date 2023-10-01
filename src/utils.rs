@@ -1,11 +1,11 @@
 use core::{mem, ptr};
 
-use winapi::ctypes::c_void;
-use error_code::SystemError;
+use error_code::ErrorCode;
 
-use crate::SysResult;
+use crate::{sys, SysResult};
+use crate::types::{c_void, c_uint};
 
-const GHND: winapi::ctypes::c_uint = 0x42;
+const GHND: c_uint = 0x42;
 
 const BYTES_LAYOUT: alloc::alloc::Layout = alloc::alloc::Layout::new::<u8>();
 
@@ -17,8 +17,8 @@ pub fn unlikely_empty_size_result<T: Default>() -> T {
 
 #[cold]
 #[inline(never)]
-pub fn unlikely_last_error() -> SystemError {
-    SystemError::last()
+pub fn unlikely_last_error() -> ErrorCode {
+    ErrorCode::last_system()
 }
 
 #[inline]
@@ -35,14 +35,14 @@ fn free_rust_mem(data: *mut c_void) {
 #[inline]
 fn unlock_data(data: *mut c_void) {
     unsafe {
-        winapi::um::winbase::GlobalUnlock(data);
+        sys::GlobalUnlock(data);
     }
 }
 
 #[inline]
 fn free_global_mem(data: *mut c_void) {
     unsafe {
-        winapi::um::winbase::GlobalFree(data);
+        sys::GlobalFree(data);
     }
 }
 
@@ -74,7 +74,7 @@ impl RawMem {
     #[inline(always)]
     pub fn new_global_mem(size: usize) -> SysResult<Self> {
         unsafe {
-            let mem = winapi::um::winbase::GlobalAlloc(GHND, size as _);
+            let mem = sys::GlobalAlloc(GHND, size as _);
             if mem.is_null() {
                 Err(unlikely_last_error())
             } else {
@@ -100,12 +100,12 @@ impl RawMem {
 
     pub fn lock(&self) -> SysResult<(ptr::NonNull<c_void>, Scope<*mut c_void>)> {
         let ptr = unsafe {
-            winapi::um::winbase::GlobalLock(self.get())
+            sys::GlobalLock(self.get())
         };
 
         match ptr::NonNull::new(ptr) {
             Some(ptr) => Ok((ptr, Scope(self.get(), unlock_data))),
-            None => Err(error_code::SystemError::last()),
+            None => Err(ErrorCode::last_system()),
         }
     }
 }

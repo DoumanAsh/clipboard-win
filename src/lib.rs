@@ -87,6 +87,8 @@ extern crate std;
 
 extern crate alloc;
 
+mod sys;
+pub mod types;
 pub mod formats;
 pub mod raw;
 pub(crate) mod utils;
@@ -94,9 +96,9 @@ pub(crate) mod utils;
 pub use raw::{get_owner, empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
 pub use formats::Unicode;
 
-pub use error_code::SystemError;
+pub use error_code::ErrorCode;
 ///Alias to result used by this crate
-pub type SysResult<T> = Result<T, error_code::SystemError>;
+pub type SysResult<T> = Result<T, ErrorCode>;
 
 ///Clipboard instance, which allows to perform clipboard ops.
 ///
@@ -123,7 +125,7 @@ impl Clipboard {
 
     #[inline(always)]
     ///Attempts to open clipboard, associating it with specified `owner` and returning clipboard instance on success.
-    pub fn new_for(owner: winapi::shared::windef::HWND) -> SysResult<Self> {
+    pub fn new_for(owner: types::HWND) -> SysResult<Self> {
         raw::open_for(owner).map(|_| Self { _dummy: () })
     }
 
@@ -135,7 +137,7 @@ impl Clipboard {
 
     #[inline]
     ///Attempts to open clipboard, giving it `num` retries in case of failure.
-    pub fn new_attempts_for(owner: winapi::shared::windef::HWND, mut num: usize) -> SysResult<Self> {
+    pub fn new_attempts_for(owner: types::HWND, mut num: usize) -> SysResult<Self> {
         loop {
             match Self::new_for(owner) {
                 Ok(this) => break Ok(this),
@@ -146,7 +148,7 @@ impl Clipboard {
             }
 
             //0 causes to yield remaining time in scheduler, but remain to be scheduled once again.
-            unsafe { winapi::um::synchapi::Sleep(0) };
+            unsafe { sys::Sleep(0) };
         }
     }
 }

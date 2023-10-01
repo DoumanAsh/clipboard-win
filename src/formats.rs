@@ -6,79 +6,78 @@
 //! Description is taken from [Standard Clipboard Formats](https://msdn.microsoft.com/en-us/library/windows/desktop/ff729168%28v=vs.85%29.aspx)
 
 use crate::{SysResult, Getter, Setter};
-
-use winapi::um::winuser;
+use crate::types::c_uint;
 
 ///A handle to a bitmap (HBITMAP).
-pub const CF_BITMAP: u32 = winuser::CF_BITMAP;
+pub const CF_BITMAP: c_uint = 2;
 ///A memory object containing a <b>BITMAPINFO</b> structure followed by the bitmap bits.
-pub const CF_DIB: u32 = winuser::CF_DIB;
+pub const CF_DIB: c_uint = 8;
 ///A memory object containing a <b>BITMAPV5HEADER</b> structure followed by the bitmap color space
 ///information and the bitmap bits.
-pub const CF_DIBV5: u32 = winuser::CF_DIBV5;
+pub const CF_DIBV5: c_uint = 17;
 ///Software Arts' Data Interchange Format.
-pub const CF_DIF: u32 = winuser::CF_DIF;
+pub const CF_DIF: c_uint = 5;
 ///Bitmap display format associated with a private format. The hMem parameter must be a handle to
 ///data that can be displayed in bitmap format in lieu of the privately formatted data.
-pub const CF_DSPBITMAP: u32 = winuser::CF_DSPBITMAP;
+pub const CF_DSPBITMAP: c_uint = 0x0082;
 ///Enhanced metafile display format associated with a private format. The *hMem* parameter must be a
 ///handle to data that can be displayed in enhanced metafile format in lieu of the privately
 ///formatted data.
-pub const CF_DSPENHMETAFILE: u32 = winuser::CF_DSPENHMETAFILE;
+pub const CF_DSPENHMETAFILE: c_uint = 0x008E;
 ///Metafile-picture display format associated with a private format. The hMem parameter must be a
 ///handle to data that can be displayed in metafile-picture format in lieu of the privately
 ///formatted data.
-pub const CF_DSPMETAFILEPICT: u32 = winuser::CF_DSPMETAFILEPICT;
+pub const CF_DSPMETAFILEPICT: c_uint = 0x0083;
 ///Text display format associated with a private format. The *hMem* parameter must be a handle to
 ///data that can be displayed in text format in lieu of the privately formatted data.
-pub const CF_DSPTEXT: u32 = winuser::CF_DSPTEXT;
+pub const CF_DSPTEXT: c_uint = 0x0081;
 ///A handle to an enhanced metafile (<b>HENHMETAFILE</b>).
-pub const CF_ENHMETAFILE: u32 = winuser::CF_ENHMETAFILE;
+pub const CF_ENHMETAFILE: c_uint = 14;
 ///Start of a range of integer values for application-defined GDI object clipboard formats.
-pub const CF_GDIOBJFIRST: u32 = winuser::CF_GDIOBJFIRST;
+pub const CF_GDIOBJFIRST: c_uint = 0x0300;
 ///End of a range of integer values for application-defined GDI object clipboard formats.
-pub const CF_GDIOBJLAST: u32 = winuser::CF_GDIOBJLAST;
+pub const CF_GDIOBJLAST: c_uint = 0x03FF;
 ///A handle to type <b>HDROP</b> that identifies a list of files.
-pub const CF_HDROP: u32 = winuser::CF_HDROP;
+pub const CF_HDROP: c_uint = 15;
 ///The data is a handle to the locale identifier associated with text in the clipboard.
 ///
 ///For details see [Standart Clipboard Formats](https://msdn.microsoft.com/en-us/library/windows/desktop/ff729168%28v=vs.85%29.aspx)
-pub const CF_LOCALE: u32 = winuser::CF_LOCALE;
+pub const CF_LOCALE: c_uint = 16;
 ///Handle to a metafile picture format as defined by the <b>METAFILEPICT</b> structure.
-pub const CF_METAFILEPICT: u32 = winuser::CF_METAFILEPICT;
+pub const CF_METAFILEPICT: c_uint = 3;
 ///Text format containing characters in the OEM character set.
-pub const CF_OEMTEXT: u32 = winuser::CF_OEMTEXT;
+pub const CF_OEMTEXT: c_uint = 7;
 ///Owner-display format.
 ///
 ///For details see [Standart Clipboard Formats](https://msdn.microsoft.com/en-us/library/windows/desktop/ff729168%28v=vs.85%29.aspx)
-pub const CF_OWNERDISPLAY: u32 = winuser::CF_OWNERDISPLAY;
+pub const CF_OWNERDISPLAY: c_uint = 0x0080;
 ///Handle to a color palette.
 ///
 ///For details see [Standart Clipboard Formats](https://msdn.microsoft.com/en-us/library/windows/desktop/ff729168%28v=vs.85%29.aspx)
-pub const CF_PALETTE: u32 = winuser::CF_PALETTE;
+pub const CF_PALETTE: c_uint = 9;
 ///Data for the pen extensions to the Microsoft Windows for Pen Computing.
-pub const CF_PENDATA: u32 = winuser::CF_PENDATA;
+pub const CF_PENDATA: c_uint = 10;
 ///Start of a range of integer values for private clipboard formats.
-pub const CF_PRIVATEFIRST: u32 = winuser::CF_PRIVATEFIRST;
+pub const CF_PRIVATEFIRST: c_uint = 0x0200;
 ///End of a range of integer values for private clipboard formats.
-pub const CF_PRIVATELAST: u32 = winuser::CF_PRIVATELAST;
+pub const CF_PRIVATELAST: c_uint = 0x02FF;
 ///Represents audio data more complex than can be represented in a ```CF_WAVE``` standard wave format.
-pub const CF_RIFF: u32 = winuser::CF_RIFF;
+pub const CF_RIFF: c_uint = 11;
 ///Microsoft Symbolic Link (SYLK) format.
-pub const CF_SYLK: u32 = winuser::CF_SYLK;
+pub const CF_SYLK: c_uint = 4;
 ///ANSI text format.
-pub const CF_TEXT: u32 = winuser::CF_TEXT;
+pub const CF_TEXT: c_uint = 1;
 ///Tagged-image file format.
-pub const CF_TIFF: u32 = winuser::CF_TIFF;
+pub const CF_TIFF: c_uint = 6;
 ///UTF16 text format.
-pub const CF_UNICODETEXT: u32 = winuser::CF_UNICODETEXT;
+pub const CF_UNICODETEXT: c_uint = 13;
 ///Represents audio data in one of the standard wave formats.
-pub const CF_WAVE: u32 = winuser::CF_WAVE;
+pub const CF_WAVE: c_uint = 12;
 
 ///Format to write/read from clipboard as raw bytes
 ///
 ///Has to be initialized with format `id`
-pub struct RawData(pub u32);
+pub struct RawData(pub c_uint);
 
 impl<T: AsRef<[u8]>> Setter<T> for RawData {
     #[inline(always)]

@@ -10,19 +10,17 @@
 //!
 //! After that Clipboard cannot be opened any more until [close()](fn.close.html) is called.
 
-use winapi::um::winuser::{OpenClipboard, CloseClipboard, EmptyClipboard, GetClipboardSequenceNumber, GetClipboardData, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats, GetClipboardFormatNameW, RegisterClipboardFormatW, SetClipboardData, GetDC, ReleaseDC, GetClipboardOwner};
-use winapi::um::winbase::{GlobalSize, GlobalLock, GlobalUnlock};
-use winapi::ctypes::{c_int, c_uint, c_void};
-use winapi::um::stringapiset::{MultiByteToWideChar, WideCharToMultiByte};
-use winapi::um::winnls::CP_UTF8;
-use winapi::um::shellapi::DragQueryFileW;
-use winapi::um::wingdi::{GetObjectW, GetDIBits, CreateDIBitmap, BITMAP, BITMAPINFO, BITMAPINFOHEADER, RGBQUAD, BI_RGB, DIB_RGB_COLORS, BITMAPFILEHEADER, CBM_INIT};
-use winapi::shared::windef::HDC;
-use winapi::shared::winerror::ERROR_INCORRECT_SIZE;
-use winapi::shared::minwindef::DWORD;
+use crate::types::*;
+use crate::sys::*;
+
+const CBM_INIT: DWORD = 0x04;
+const BI_RGB: DWORD = 0;
+const DIB_RGB_COLORS: DWORD = 0;
+const ERROR_INCORRECT_SIZE: DWORD = 1462;
+const CP_UTF8: DWORD = 65001;
 
 use str_buf::StrBuf;
-use error_code::SystemError;
+use error_code::ErrorCode;
 
 use core::{slice, mem, ptr, cmp};
 use core::num::{NonZeroUsize, NonZeroU32};
@@ -73,9 +71,9 @@ pub fn open() -> SysResult<()> {
 ///# Post-conditions (if successful):
 ///
 ///* Clipboard can be accessed for read and write operations.
-pub fn open_for(owner: winapi::shared::windef::HWND) -> SysResult<()> {
+pub fn open_for(owner: HWND) -> SysResult<()> {
     match unsafe { OpenClipboard(owner) } {
-        0 => Err(SystemError::last()),
+        0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
     }
 }
@@ -90,7 +88,7 @@ pub fn open_for(owner: winapi::shared::windef::HWND) -> SysResult<()> {
 ///* [open()](fn.open.html) has been called.
 pub fn close() -> SysResult<()> {
     match unsafe { CloseClipboard() } {
-        0 => Err(SystemError::last()),
+        0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
     }
 }
@@ -105,7 +103,7 @@ pub fn close() -> SysResult<()> {
 ///* [open()](fn.open.html) has been called.
 pub fn empty() -> SysResult<()> {
     match unsafe { EmptyClipboard() } {
-        0 => Err(SystemError::last()),
+        0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
     }
 }
@@ -188,10 +186,12 @@ pub fn size(format: u32) -> Option<NonZeroUsize> {
 ///
 ///* [open()](fn.open.html) has been called.
 pub fn get_clipboard_data(format: c_uint) -> SysResult<ptr::NonNull<c_void>> {
-    let ptr = unsafe { GetClipboardData(format) as *mut c_void };
+    let ptr = unsafe {
+        GetClipboardData(format)
+    };
     match ptr::NonNull::new(ptr) {
         Some(ptr) => Ok(ptr),
-        None => Err(SystemError::last()),
+        None => Err(ErrorCode::last_system()),
     }
 }
 
@@ -209,7 +209,7 @@ pub fn count_formats() -> Option<usize> {
     let result = unsafe { CountClipboardFormats() };
 
     if result == 0 {
-        if !SystemError::last().is_zero() {
+        if ErrorCode::last_system().raw_code() != 0 {
             return None
         }
     }
@@ -295,7 +295,7 @@ pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
         return Ok(());
     }
 
-    Err(error_code::SystemError::last())
+    Err(ErrorCode::last_system())
 }
 
 ///Copies raw bytes from clipboard with specified `format`, appending to `out` buffer.
@@ -310,7 +310,7 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
         let storage_req_size = WideCharToMultiByte(CP_UTF8, 0, data_ptr.as_ptr() as _, data_size as _, ptr::null_mut(), 0, ptr::null(), ptr::null_mut());
 
         if storage_req_size == 0 {
-            return Err(SystemError::last());
+            return Err(ErrorCode::last_system());
         }
 
         let storage_cursor = out.len();
@@ -359,7 +359,7 @@ pub fn set_string(data: &str) -> SysResult<()> {
         }
     }
 
-    Err(error_code::SystemError::last())
+    Err(ErrorCode::last_system())
 }
 
 #[cfg(feature = "std")]
@@ -381,14 +381,14 @@ pub fn get_file_list_path(out: &mut alloc::vec::Vec<std::path::PathBuf>) -> SysR
     for idx in 0..num_files {
         let required_size_no_null = unsafe { DragQueryFileW(clipboard_data.get() as _, idx, ptr::null_mut(), 0) };
         if required_size_no_null == 0 {
-            return Err(SystemError::last());
+            return Err(ErrorCode::last_system());
         }
 
         let required_size = required_size_no_null + 1;
         buffer.reserve(required_size as usize);
 
         if unsafe { DragQueryFileW(clipboard_data.get() as _, idx, buffer.as_mut_ptr(), required_size) == 0 } {
-            return Err(SystemError::last());
+            return Err(ErrorCode::last_system());
         }
 
         unsafe {
@@ -419,14 +419,14 @@ pub fn get_file_list(out: &mut alloc::vec::Vec<alloc::string::String>) -> SysRes
     for idx in 0..num_files {
         let required_size_no_null = unsafe { DragQueryFileW(clipboard_data.get() as _, idx, ptr::null_mut(), 0) };
         if required_size_no_null == 0 {
-            return Err(SystemError::last());
+            return Err(ErrorCode::last_system());
         }
 
         let required_size = required_size_no_null + 1;
         buffer.reserve(required_size as usize);
 
         if unsafe { DragQueryFileW(clipboard_data.get() as _, idx, buffer.as_mut_ptr(), required_size) == 0 } {
-            return Err(SystemError::last());
+            return Err(ErrorCode::last_system());
         }
 
         unsafe {
@@ -457,7 +457,7 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     };
 
     if unsafe { GetObjectW(clipboard_data.as_ptr(), mem::size_of::<BITMAP>() as _, &mut bitmap as *mut BITMAP as _) } == 0 {
-        return Err(SystemError::last());
+        return Err(ErrorCode::last_system());
     }
 
     let clr_bits = bitmap.bmPlanes * bitmap.bmBitsPixel;
@@ -506,7 +506,7 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     buffer.resize(img_size, 0u8);
 
     if unsafe { GetDIBits(dc.0, clipboard_data.as_ptr() as _, 0, bitmap.bmHeight as _, buffer.as_mut_ptr() as _, header_storage.get() as _, DIB_RGB_COLORS) } == 0 {
-        return Err(SystemError::last());
+        return Err(ErrorCode::last_system());
     }
 
     //Write header
@@ -553,7 +553,7 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
 
     if data.len() <= (FILE_HEADER_LEN + INFO_HEADER_LEN) {
-        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+        return Err(ErrorCode::new_system(ERROR_INCORRECT_SIZE as _));
     }
 
     let mut file_header = mem::MaybeUninit::<BITMAPFILEHEADER>::uninit();
@@ -566,13 +566,13 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     };
 
     if data.len() <= file_header.bfOffBits as usize {
-        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+        return Err(ErrorCode::new_system(ERROR_INCORRECT_SIZE as _));
     }
 
     let bitmap = &data[file_header.bfOffBits as _..];
 
     if bitmap.len() < info_header.biSizeImage as usize {
-        return Err(SystemError::new(ERROR_INCORRECT_SIZE as _));
+        return Err(ErrorCode::new_system(ERROR_INCORRECT_SIZE as _));
     }
 
     let dc = crate::utils::Scope(unsafe { GetDC(ptr::null_mut()) }, free_dc);
@@ -582,12 +582,12 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     };
 
     if handle.is_null() {
-        return Err(SystemError::last());
+        return Err(ErrorCode::last_system());
     }
 
     let _ = empty();
     if unsafe { SetClipboardData(formats::CF_BITMAP, handle as _).is_null() } {
-        return Err(SystemError::last());
+        return Err(ErrorCode::last_system());
     }
 
     Ok(())
@@ -596,7 +596,6 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 
 ///Set list of file paths to clipboard.
 pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
-    use winapi::shared::windef::POINT;
     #[repr(C, packed(1))]
     pub struct DROPFILES {
         pub p_files: u32,
@@ -616,7 +615,7 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
     }
 
     if file_list_size == 0 {
-        return Err(error_code::SystemError::last());
+        return Err(ErrorCode::last_system());
     }
 
     let dropfiles = DROPFILES {
@@ -657,7 +656,7 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
         mem.release();
         return Ok(());
     }
-    return Err(error_code::SystemError::last());
+    return Err(ErrorCode::last_system());
 }
 
 
@@ -755,7 +754,7 @@ macro_rules! match_format_name {
                     let buff_p = format_buff.as_mut_ptr() as *mut u16;
                     match GetClipboardFormatNameW($name, buff_p, format_buff.len() as c_int) {
                         0 => return None,
-                        len => match WideCharToMultiByte(winapi::um::winnls::CP_UTF8, 0, format_buff.as_ptr(), len, result.as_ptr() as *mut i8, result.remaining() as i32, ptr::null(), ptr::null_mut()) {
+                        len => match WideCharToMultiByte(CP_UTF8, 0, format_buff.as_ptr(), len, result.as_ptr() as *mut i8, result.remaining() as i32, ptr::null(), ptr::null_mut()) {
                             0 => return None,
                             len => result.set_len(len as u8),
                         }
@@ -903,7 +902,7 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
 ///Retrieves the window handle of the current owner of the clipboard.
 ///
 ///Returns `None` if clipboard is not owned.
-pub fn get_owner() -> Option<ptr::NonNull::<winapi::shared::windef::HWND__>> {
+pub fn get_owner() -> Option<ptr::NonNull::<c_void>> {
     ptr::NonNull::new(unsafe {
         GetClipboardOwner()
     })
