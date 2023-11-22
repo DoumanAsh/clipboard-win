@@ -1,5 +1,6 @@
 use crate::types::*;
 
+#[link(name = "kernel32", kind = "dylib")]
 extern "system" {
     pub fn GlobalLock(hMem: HGLOBAL) -> LPVOID;
     pub fn GlobalUnlock(hmem: HGLOBAL) -> BOOL;
@@ -12,6 +13,7 @@ extern "system" {
     pub fn MultiByteToWideChar(CodePage: c_uint, dwFlags: DWORD, lpMultiByteStr: *const u8, cbMultiByte: c_int, lpWideCharStr: *mut u16, cchWideChar: c_int) -> c_int;
 }
 
+#[link(name = "user32", kind = "dylib")]
 extern "system" {
     pub fn ReleaseDC(hWnd: HWND, hDC: HDC) -> c_int;
     pub fn GetDC(hWnd: HWND) -> HDC;
@@ -28,11 +30,14 @@ extern "system" {
     pub fn GetClipboardData(uFormat: c_uint) -> HANDLE;
     pub fn SetClipboardData(uFormat: c_uint, hMem: HANDLE) -> HANDLE;
     pub fn GetClipboardOwner() -> HWND;
-
-    pub fn DragQueryFileW(hDrop: HDROP, iFile: c_uint, lpszFile: *mut u16, cch: c_uint) -> c_uint;
-
 }
 
+#[link(name = "shell32", kind = "dylib")]
+extern "system" {
+    pub fn DragQueryFileW(hDrop: HDROP, iFile: c_uint, lpszFile: *mut u16, cch: c_uint) -> c_uint;
+}
+
+#[link(name = "gdi32", kind = "dylib")]
 extern "system" {
     pub fn CreateDIBitmap(hdc: HDC, pbmih: *const BITMAPINFOHEADER, flInit: DWORD, pjBits: *const c_void, pbmi: *const BITMAPINFO, iUsage: c_uint) -> HBITMAP;
     pub fn GetDIBits(hdc: HDC, hbm: HBITMAP, start: c_uint, cLines: c_uint, lpvBits: *mut c_void, lpbmi: *mut BITMAPINFO, usage: c_uint) -> c_int;
