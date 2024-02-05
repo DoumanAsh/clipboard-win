@@ -502,8 +502,7 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     let out_before = out.len();
 
     let dc = crate::utils::Scope(unsafe { GetDC(ptr::null_mut()) }, free_dc);
-    let mut buffer = alloc::vec::Vec::new();
-    buffer.resize(img_size, 0u8);
+    let mut buffer = alloc::vec![0; img_size];
 
     if unsafe { GetDIBits(dc.0, clipboard_data.as_ptr() as _, 0, bitmap.bmHeight as _, buffer.as_mut_ptr() as _, header_storage.get() as _, DIB_RGB_COLORS) } == 0 {
         return Err(ErrorCode::last_system());

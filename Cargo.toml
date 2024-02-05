@@ -26,5 +26,15 @@ default-target = "x86_64-pc-windows-msvc"
 [target.'cfg(windows)'.dependencies]
 error-code = "3"
 
+[target.'cfg(windows)'.dependencies.windows-win]
+version = "3"
+optional = true
+
 [features]
 std = ["error-code/std"]
+# Enables clipboard monitoring code
+monitor = ["windows-win"]
+
+[[test]]
+name = "monitor"
+required-features = ["monitor"]

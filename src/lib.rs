@@ -10,6 +10,7 @@
 //!# Features
 //!
 //! - `std` - Enables usage of `std`, including `std::error::Error` trait.
+//! - `monitor` - Enables code related to clipboard monitoring.
 //!
 //!# Clipboard
 //!
@@ -91,6 +92,10 @@ mod sys;
 pub mod types;
 pub mod formats;
 pub mod raw;
+#[cfg(feature = "monitor")]
+pub mod monitor;
+#[cfg(feature = "monitor")]
+pub use monitor::Monitor;
 pub(crate) mod utils;
 
 pub use raw::{get_owner, empty, seq_num, size, is_format_avail, register_format, count_formats, EnumFormats};
