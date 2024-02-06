@@ -15,7 +15,6 @@ use windows_win::sys::{
     WM_CLIPBOARDUPDATE,
 };
 
-
 const CLOSE_PARAM: isize = -1;
 
 ///Shutdown channel
@@ -82,8 +81,10 @@ impl Drop for ClipboardListener {
 ///
 ///Therefore you generally should start listening for messages once you created instance
 ///
-///`Monitor` implements `Iterator` by continuously calling `Monitor::recv` and returning the same result
+///`Monitor` implements `Iterator` by continuously calling `Monitor::recv` and returning the same result.
 ///This `Iterator` is never ending, even when you perform shutdown.
+///
+///You should use `Shutdown` to interrupt blocking `Monitor::recv`
 pub struct Monitor {
     _listener: ClipboardListener,
     window: Window,
@@ -119,7 +120,7 @@ impl Monitor {
         }
     }
 
-    ///Blocks waiting for new clipboard message
+    ///Waits for new clipboard message, blocking until then.
     ///
     ///Returns `Ok(true)` if event received.
     ///
@@ -136,11 +137,12 @@ impl Monitor {
         unreachable!();
     }
 
-    ///Attempts to check if there is any clipboard update event
+    ///Attempts to get any clipboard update event
     ///
-    ///Returns `Ok(true)` if event received, otherwise return `Ok(false)`
+    ///Returns `Ok(true)` if event received,
+    ///otherwise return `Ok(false)` indicating no clipboard event present
     ///
-    ///If `Shutdown` request detected, it is skipped
+    ///If `Shutdown` request detected, it is ignored
     pub fn try_recv(&mut self) -> Result<bool, ErrorCode> {
         let mut iter = self.iter();
         iter.non_blocking();
