@@ -4,15 +4,10 @@ on: [push, pull_request]
 
 jobs:
   build:
-
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [windows-latest]
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
 
     - name: Install Rust Windows
       if: runner.os == 'Windows'
@@ -31,16 +26,16 @@ jobs:
         rustc --version
 
     - name: Check std
-      run: cargo check --features std
+      run: cargo check --features std,monitor
 
     - name: Test
-      run: cargo test
+      run: cargo test --features monitor
       env:
         RUST_TEST_THREADS: 1
 
     - name: Test x86
       run: |
         rustup target add i686-pc-windows-msvc
-        cargo test --target i686-pc-windows-msvc
+        cargo test --target i686-pc-windows-msvc --features monitor
       env:
         RUST_TEST_THREADS: 1
