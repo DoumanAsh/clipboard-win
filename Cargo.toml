@@ -22,6 +22,7 @@ include = [
 
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
+features = ["monitor"]
 
 [target.'cfg(windows)'.dependencies]
 error-code = "3"
