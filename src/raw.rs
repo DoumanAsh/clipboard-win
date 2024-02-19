@@ -22,14 +22,14 @@ const CP_UTF8: DWORD = 65001;
 
 use error_code::ErrorCode;
 
-use core::{slice, mem, ptr, cmp};
+use core::{slice, mem, ptr, cmp, str, hint};
 use core::num::{NonZeroUsize, NonZeroU32};
 
 use alloc::string::String;
 use alloc::borrow::ToOwned;
 use alloc::format;
 
-use crate::{SysResult, formats};
+use crate::{SysResult, html, formats};
 use crate::utils::{unlikely_empty_size_result, RawMem};
 
 #[inline(always)]
@@ -259,6 +259,63 @@ pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
         out.set_len(storage_cursor + data_size as usize);
 
         data_size
+    };
+
+    Ok(result)
+}
+
+///Retrieves HTML using format code created by `register_raw_format` or `register_format` with
+///argument `HTML Format`
+pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
+    let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
+
+    let result = unsafe {
+        let (data_ptr, _lock) = ptr.lock()?;
+        let data_size = GlobalSize(ptr.get()) as usize;
+
+        let data = str::from_utf8_unchecked(
+            slice::from_raw_parts(data_ptr.as_ptr() as *const u8, data_size)
+        );
+
+        let mut start_idx = 0usize;
+        let mut end_idx = data.len();
+        for line in data.lines() {
+            let mut split = line.split(html::SEP);
+            let key = match split.next() {
+                Some(key) => key,
+                None => hint::unreachable_unchecked(),
+            };
+            let value = match split.next() {
+                Some(value) => value,
+                //Reached HTML
+                None => break
+            };
+            match key {
+                html::START_FRAGMENT => match value.trim_start_matches('0').parse() {
+                    Ok(value) => {
+                        start_idx = value;
+                        continue;
+                    }
+                    //Should not really happen
+                    Err(_) => break,
+                },
+                html::END_FRAGMENT => match value.trim_start_matches('0').parse() {
+                    Ok(value) => {
+                        end_idx = value;
+                        continue;
+                    }
+                    //Should not really happen
+                    Err(_) => break,
+                },
+                _ => continue,
+            }
+        }
+        let size = end_idx - start_idx;
+        out.reserve(size);
+        let out_cursor = out.len();
+        ptr::copy_nonoverlapping(data.as_ptr().add(start_idx), out.spare_capacity_mut().as_mut_ptr().add(out_cursor) as _, size);
+        out.set_len(out_cursor + size);
+        size
     };
 
     Ok(result)
@@ -886,7 +943,7 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
             register_raw_format(&buffer)
         }
     } else {
-        let mut buffer = mem::MaybeUninit::<[u16; 52]>::uninit();
+        let mut buffer = mem::MaybeUninit::<[u16; 52]>::zeroed();
         let size = unsafe {
             MultiByteToWideChar(CP_UTF8, 0, name.as_ptr() as *const _, name.len() as c_int, buffer.as_mut_ptr() as *mut u16, 51)
         };

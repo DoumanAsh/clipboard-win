@@ -91,6 +91,7 @@ extern crate alloc;
 mod sys;
 pub mod types;
 pub mod formats;
+mod html;
 pub mod raw;
 #[cfg(feature = "monitor")]
 pub mod monitor;
