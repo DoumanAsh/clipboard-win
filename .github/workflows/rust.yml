@@ -1,10 +1,28 @@
 name: Rust
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/rust.yml'
+      - 'src/**.rs'
+      - 'tests/**'
+      - 'Cargo.toml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - '**'
+    paths:
+      - '.github/workflows/rust.yml'
+      - 'src/**.rs'
+      - 'tests/**'
+      - 'Cargo.toml'
 
 jobs:
   build:
     runs-on: windows-latest
+    if: github.event.pull_request.draft == false
 
     steps:
     - uses: actions/checkout@v4
