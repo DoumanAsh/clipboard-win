@@ -205,3 +205,10 @@ impl Getter<alloc::string::String> for Html {
         crate::raw::get_html(self.0.get(), unsafe { out.as_mut_vec() })
     }
 }
+
+impl<T: AsRef<str>> Setter<T> for Html {
+    #[inline(always)]
+    fn write_clipboard(&self, data: &T) -> SysResult<()> {
+        crate::raw::set_html(self.code(), data.as_ref())
+    }
+}

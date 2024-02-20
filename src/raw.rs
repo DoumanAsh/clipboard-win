@@ -264,8 +264,7 @@ pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(result)
 }
 
-///Retrieves HTML using format code created by `register_raw_format` or `register_format` with
-///argument `HTML Format`
+///Retrieves HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
 pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
 
@@ -319,6 +318,91 @@ pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> 
     };
 
     Ok(result)
+}
+
+///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
+pub fn set_html(format: u32, html: &str) -> SysResult<()> {
+    const VERSION_VALUE: &str = ":0.9";
+    const HEADER_SIZE: usize = html::VERSION.len() + VERSION_VALUE.len() + html::NEWLINE.len()
+                               + html::START_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::END_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::START_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::END_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len();
+    const FRAGMENT_OFFSET: usize = HEADER_SIZE + html::BODY_HEADER.len();
+
+    let total_size = FRAGMENT_OFFSET + html::BODY_FOOTER.len() + html.len();
+
+    let mut len_buffer = html::LengthBuffer::new();
+    let mem = RawMem::new_global_mem(total_size)?;
+
+    unsafe {
+        use core::fmt::Write;
+        let (ptr, _lock) = mem.lock()?;
+        let out = slice::from_raw_parts_mut(ptr.as_ptr() as *mut mem::MaybeUninit<u8>, total_size);
+
+        let mut cursor = 0;
+        macro_rules! write_out {
+            ($input:expr) => {
+                let input = $input;
+                ptr::copy_nonoverlapping(input.as_ptr() as *const u8, out.as_mut_ptr().add(cursor) as _, input.len());
+                cursor += input.len();
+            };
+        }
+
+        write_out!(html::VERSION);
+        write_out!(VERSION_VALUE);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", HEADER_SIZE);
+        write_out!(html::START_HTML);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", total_size);
+        write_out!(html::END_HTML);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", FRAGMENT_OFFSET);
+        write_out!(html::START_FRAGMENT);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", total_size - html::BODY_FOOTER.len());
+        write_out!(html::END_FRAGMENT);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        //Verify StartHTML is correct
+        debug_assert_eq!(HEADER_SIZE, cursor);
+
+        write_out!(html::BODY_HEADER);
+
+        //Verify StartFragment is correct
+        debug_assert_eq!(FRAGMENT_OFFSET, cursor);
+
+        write_out!(html);
+
+        //Verify EndFragment is correct
+        debug_assert_eq!(total_size - html::BODY_FOOTER.len(), cursor);
+
+        write_out!(html::BODY_FOOTER);
+
+        //Verify EndHTML is correct
+        debug_assert_eq!(cursor, total_size);
+    }
+
+    if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
+        //SetClipboardData takes ownership
+        mem.release();
+        Ok(())
+    } else {
+        Err(ErrorCode::last_system())
+    }
 }
 
 /// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
@@ -710,11 +794,11 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
         mem.release();
-        return Ok(());
+        Ok(())
+    } else {
+        Err(ErrorCode::last_system())
     }
-    return Err(ErrorCode::last_system());
 }
-
 
 ///Enumerator over available clipboard formats.
 ///

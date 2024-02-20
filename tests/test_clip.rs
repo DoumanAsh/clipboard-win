@@ -121,14 +121,23 @@ fn should_set_owner() {
 }
 
 fn should_set_get_html() {
+    const HTML: &str = "<tr>1</tr>";
     let html1 = Html::new().expect("Create html1");
     let html2 = Html::new().expect("Create html2");
     assert_eq!(html1.code(), html2.code());
 
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+    html1.write_clipboard(&HTML).expect("write clipboard");
+
     let mut out = String::new();
-    //TODO: need setter for this test to work
     html1.read_clipboard(&mut out).expect("read clipboard");
+    assert_eq!(out, HTML);
+
+    //Check empty output works
+    html1.write_clipboard(&"").expect("write clipboard");
+    out.clear();
+    html1.read_clipboard(&mut out).expect("read clipboard");
+    assert!(out.is_empty());
 }
 
 macro_rules! run {
