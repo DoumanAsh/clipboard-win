@@ -126,8 +126,11 @@ fn should_set_get_html() {
     let html2 = Html::new().expect("Create html2");
     assert_eq!(html1.code(), html2.code());
 
+    assert!(!is_format_avail(html1.code()));
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
     html1.write_clipboard(&HTML).expect("write clipboard");
+
+    assert!(is_format_avail(html1.code()));
 
     let mut out = String::new();
     html1.read_clipboard(&mut out).expect("read clipboard");
@@ -135,6 +138,8 @@ fn should_set_get_html() {
 
     //Check empty output works
     html1.write_clipboard(&"").expect("write clipboard");
+    assert!(is_format_avail(html1.into()));
+
     out.clear();
     html1.read_clipboard(&mut out).expect("read clipboard");
     assert!(out.is_empty());

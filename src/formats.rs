@@ -169,6 +169,7 @@ impl<T: AsRef<[u8]>> Setter<T> for Bitmap {
     }
 }
 
+#[derive(Copy, Clone)]
 ///HTML Foramt
 ///
 ///Reference: https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format
@@ -210,5 +211,12 @@ impl<T: AsRef<str>> Setter<T> for Html {
     #[inline(always)]
     fn write_clipboard(&self, data: &T) -> SysResult<()> {
         crate::raw::set_html(self.code(), data.as_ref())
+    }
+}
+
+impl From<Html> for u32 {
+    #[inline(always)]
+    fn from(value: Html) -> Self {
+        value.code()
     }
 }
