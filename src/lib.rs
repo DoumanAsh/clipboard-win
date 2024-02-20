@@ -91,6 +91,7 @@ extern crate alloc;
 mod sys;
 pub mod types;
 pub mod formats;
+pub use formats::Format;
 mod html;
 pub mod raw;
 #[cfg(feature = "monitor")]
