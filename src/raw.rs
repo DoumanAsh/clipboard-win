@@ -309,7 +309,16 @@ pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> 
                 _ => continue,
             }
         }
-        let size = end_idx - start_idx;
+
+        //Make sure HTML writer didn't screw up offsets of fragment
+        let size = match end_idx.checked_sub(start_idx) {
+            Some(size) => size,
+            None => return Err(ErrorCode::new_system(13)),
+        };
+        if size > data_size {
+            return Err(ErrorCode::new_system(13));
+        }
+
         out.reserve(size);
         let out_cursor = out.len();
         ptr::copy_nonoverlapping(data.as_ptr().add(start_idx), out.spare_capacity_mut().as_mut_ptr().add(out_cursor) as _, size);
