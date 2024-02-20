@@ -1,5 +1,5 @@
 use clipboard_win::{Getter, Setter, Clipboard, is_format_avail, types};
-use clipboard_win::formats::{RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList, CF_HDROP};
+use clipboard_win::formats::{Html, RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList, CF_HDROP};
 
 fn should_set_file_list() {
     let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
@@ -120,6 +120,31 @@ fn should_set_owner() {
     }
 }
 
+fn should_set_get_html() {
+    const HTML: &str = "<tr>1</tr>";
+    let html1 = Html::new().expect("Create html1");
+    let html2 = Html::new().expect("Create html2");
+    assert_eq!(html1.code(), html2.code());
+
+    assert!(!is_format_avail(html1.code()));
+    let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
+    html1.write_clipboard(&HTML).expect("write clipboard");
+
+    assert!(is_format_avail(html1.code()));
+
+    let mut out = String::new();
+    html1.read_clipboard(&mut out).expect("read clipboard");
+    assert_eq!(out, HTML);
+
+    //Check empty output works
+    html1.write_clipboard(&"").expect("write clipboard");
+    assert!(is_format_avail(html1.into()));
+
+    out.clear();
+    html1.read_clipboard(&mut out).expect("read clipboard");
+    assert!(out.is_empty());
+}
+
 macro_rules! run {
     ($name:ident) => {
         println!("Clipboard test: {}...", stringify!($name));
@@ -139,4 +164,5 @@ fn clipboard_should_work() {
     run!(should_work_with_bytes);
     run!(should_work_with_set_empty_string);
     run!(should_set_owner);
+    run!(should_set_get_html);
 }

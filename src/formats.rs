@@ -8,6 +8,8 @@
 use crate::{SysResult, Getter, Setter};
 use crate::types::c_uint;
 
+use core::num::NonZeroU32;
+
 ///A handle to a bitmap (HBITMAP).
 pub const CF_BITMAP: c_uint = 2;
 ///A memory object containing a <b>BITMAPINFO</b> structure followed by the bitmap bits.
@@ -164,5 +166,57 @@ impl<T: AsRef<[u8]>> Setter<T> for Bitmap {
     #[inline(always)]
     fn write_clipboard(&self, data: &T) -> SysResult<()> {
         crate::raw::set_bitmap(data.as_ref())
+    }
+}
+
+#[derive(Copy, Clone)]
+///HTML Foramt
+///
+///Reference: https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format
+pub struct Html(NonZeroU32);
+
+impl Html {
+    #[inline(always)]
+    ///Creates new instance, if possible
+    pub fn new() -> Option<Self> {
+        //utf-16 "HTML Format"
+        const NAME: [u16; 12] = [72, 84, 77, 76, 32, 70, 111, 114, 109, 97, 116, 0];
+        unsafe {
+            crate::raw::register_raw_format(&NAME).map(Self)
+        }
+    }
+
+    #[inline(always)]
+    ///Gets raw format code
+    pub fn code(&self) -> u32 {
+        self.0.get()
+    }
+}
+
+impl Getter<alloc::vec::Vec<u8>> for Html {
+    #[inline(always)]
+    fn read_clipboard(&self, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
+        crate::raw::get_html(self.0.get(), out)
+    }
+}
+
+impl Getter<alloc::string::String> for Html {
+    #[inline(always)]
+    fn read_clipboard(&self, out: &mut alloc::string::String) -> SysResult<usize> {
+        crate::raw::get_html(self.0.get(), unsafe { out.as_mut_vec() })
+    }
+}
+
+impl<T: AsRef<str>> Setter<T> for Html {
+    #[inline(always)]
+    fn write_clipboard(&self, data: &T) -> SysResult<()> {
+        crate::raw::set_html(self.code(), data.as_ref())
+    }
+}
+
+impl From<Html> for u32 {
+    #[inline(always)]
+    fn from(value: Html) -> Self {
+        value.code()
     }
 }

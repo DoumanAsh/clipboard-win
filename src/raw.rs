@@ -22,14 +22,14 @@ const CP_UTF8: DWORD = 65001;
 
 use error_code::ErrorCode;
 
-use core::{slice, mem, ptr, cmp};
+use core::{slice, mem, ptr, cmp, str, hint};
 use core::num::{NonZeroUsize, NonZeroU32};
 
 use alloc::string::String;
 use alloc::borrow::ToOwned;
 use alloc::format;
 
-use crate::{SysResult, formats};
+use crate::{SysResult, html, formats};
 use crate::utils::{unlikely_empty_size_result, RawMem};
 
 #[inline(always)]
@@ -262,6 +262,156 @@ pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     };
 
     Ok(result)
+}
+
+///Retrieves HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
+pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
+    let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
+
+    let result = unsafe {
+        let (data_ptr, _lock) = ptr.lock()?;
+        let data_size = GlobalSize(ptr.get()) as usize;
+
+        let data = str::from_utf8_unchecked(
+            slice::from_raw_parts(data_ptr.as_ptr() as *const u8, data_size)
+        );
+
+        let mut start_idx = 0usize;
+        let mut end_idx = data.len();
+        for line in data.lines() {
+            let mut split = line.split(html::SEP);
+            let key = match split.next() {
+                Some(key) => key,
+                None => hint::unreachable_unchecked(),
+            };
+            let value = match split.next() {
+                Some(value) => value,
+                //Reached HTML
+                None => break
+            };
+            match key {
+                html::START_FRAGMENT => match value.trim_start_matches('0').parse() {
+                    Ok(value) => {
+                        start_idx = value;
+                        continue;
+                    }
+                    //Should not really happen
+                    Err(_) => break,
+                },
+                html::END_FRAGMENT => match value.trim_start_matches('0').parse() {
+                    Ok(value) => {
+                        end_idx = value;
+                        continue;
+                    }
+                    //Should not really happen
+                    Err(_) => break,
+                },
+                _ => continue,
+            }
+        }
+
+        //Make sure HTML writer didn't screw up offsets of fragment
+        let size = match end_idx.checked_sub(start_idx) {
+            Some(size) => size,
+            None => return Err(ErrorCode::new_system(13)),
+        };
+        if size > data_size {
+            return Err(ErrorCode::new_system(13));
+        }
+
+        out.reserve(size);
+        let out_cursor = out.len();
+        ptr::copy_nonoverlapping(data.as_ptr().add(start_idx), out.spare_capacity_mut().as_mut_ptr().add(out_cursor) as _, size);
+        out.set_len(out_cursor + size);
+        size
+    };
+
+    Ok(result)
+}
+
+///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
+pub fn set_html(format: u32, html: &str) -> SysResult<()> {
+    const VERSION_VALUE: &str = ":0.9";
+    const HEADER_SIZE: usize = html::VERSION.len() + VERSION_VALUE.len() + html::NEWLINE.len()
+                               + html::START_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::END_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::START_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
+                               + html::END_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len();
+    const FRAGMENT_OFFSET: usize = HEADER_SIZE + html::BODY_HEADER.len();
+
+    let total_size = FRAGMENT_OFFSET + html::BODY_FOOTER.len() + html.len();
+
+    let mut len_buffer = html::LengthBuffer::new();
+    let mem = RawMem::new_global_mem(total_size)?;
+
+    unsafe {
+        use core::fmt::Write;
+        let (ptr, _lock) = mem.lock()?;
+        let out = slice::from_raw_parts_mut(ptr.as_ptr() as *mut mem::MaybeUninit<u8>, total_size);
+
+        let mut cursor = 0;
+        macro_rules! write_out {
+            ($input:expr) => {
+                let input = $input;
+                ptr::copy_nonoverlapping(input.as_ptr() as *const u8, out.as_mut_ptr().add(cursor) as _, input.len());
+                cursor += input.len();
+            };
+        }
+
+        write_out!(html::VERSION);
+        write_out!(VERSION_VALUE);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", HEADER_SIZE);
+        write_out!(html::START_HTML);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", total_size);
+        write_out!(html::END_HTML);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", FRAGMENT_OFFSET);
+        write_out!(html::START_FRAGMENT);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        let _ = write!(&mut len_buffer, "{:0>10}", total_size - html::BODY_FOOTER.len());
+        write_out!(html::END_FRAGMENT);
+        write_out!([html::SEP as u8]);
+        write_out!(&len_buffer);
+        write_out!(html::NEWLINE);
+
+        //Verify StartHTML is correct
+        debug_assert_eq!(HEADER_SIZE, cursor);
+
+        write_out!(html::BODY_HEADER);
+
+        //Verify StartFragment is correct
+        debug_assert_eq!(FRAGMENT_OFFSET, cursor);
+
+        write_out!(html);
+
+        //Verify EndFragment is correct
+        debug_assert_eq!(total_size - html::BODY_FOOTER.len(), cursor);
+
+        write_out!(html::BODY_FOOTER);
+
+        //Verify EndHTML is correct
+        debug_assert_eq!(cursor, total_size);
+    }
+
+    if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
+        //SetClipboardData takes ownership
+        mem.release();
+        Ok(())
+    } else {
+        Err(ErrorCode::last_system())
+    }
 }
 
 /// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
@@ -653,11 +803,11 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
         mem.release();
-        return Ok(());
+        Ok(())
+    } else {
+        Err(ErrorCode::last_system())
     }
-    return Err(ErrorCode::last_system());
 }
-
 
 ///Enumerator over available clipboard formats.
 ///
@@ -886,7 +1036,7 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
             register_raw_format(&buffer)
         }
     } else {
-        let mut buffer = mem::MaybeUninit::<[u16; 52]>::uninit();
+        let mut buffer = mem::MaybeUninit::<[u16; 52]>::zeroed();
         let size = unsafe {
             MultiByteToWideChar(CP_UTF8, 0, name.as_ptr() as *const _, name.len() as c_int, buffer.as_mut_ptr() as *mut u16, 51)
         };
