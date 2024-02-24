@@ -32,6 +32,12 @@ use alloc::format;
 use crate::{SysResult, html, formats};
 use crate::utils::{unlikely_empty_size_result, RawMem};
 
+#[cold]
+#[inline(never)]
+fn invalid_data() -> ErrorCode {
+    ErrorCode::new_system(13)
+}
+
 #[inline(always)]
 fn free_dc(data: HDC) {
     unsafe {
@@ -272,9 +278,10 @@ pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> 
         let (data_ptr, _lock) = ptr.lock()?;
         let data_size = GlobalSize(ptr.get()) as usize;
 
-        let data = str::from_utf8_unchecked(
-            slice::from_raw_parts(data_ptr.as_ptr() as *const u8, data_size)
-        );
+        let data = match str::from_utf8(slice::from_raw_parts(data_ptr.as_ptr() as *const u8, data_size)) {
+            Ok(data) => data,
+            Err(_) => return Err(invalid_data()),
+        };
 
         let mut start_idx = 0usize;
         let mut end_idx = data.len();
@@ -313,10 +320,10 @@ pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> 
         //Make sure HTML writer didn't screw up offsets of fragment
         let size = match end_idx.checked_sub(start_idx) {
             Some(size) => size,
-            None => return Err(ErrorCode::new_system(13)),
+            None => return Err(invalid_data()),
         };
         if size > data_size {
-            return Err(ErrorCode::new_system(13));
+            return Err(invalid_data())
         }
 
         out.reserve(size);
