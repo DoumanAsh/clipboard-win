@@ -208,7 +208,7 @@ pub fn is_format_avail(format: c_uint) -> bool {
 }
 
 #[inline(always)]
-///Returns the first available format in the specified list
+///Returns the first available format in the specified list.
 ///
 ///Returns `None` if no format is available or clipboard is empty
 pub fn which_format_avail(formats: &[c_uint]) -> Option<NonZeroU32> {
