@@ -23,6 +23,7 @@ extern "system" {
     pub fn EmptyClipboard() -> BOOL;
     pub fn GetClipboardSequenceNumber() -> DWORD;
     pub fn IsClipboardFormatAvailable(format: c_uint) -> BOOL;
+    pub fn GetPriorityClipboardFormat(formats: *const c_uint, size: c_int) -> BOOL;
     pub fn CountClipboardFormats() -> c_int;
     pub fn EnumClipboardFormats(format: c_uint) -> c_uint;
     pub fn GetClipboardFormatNameW(format: c_uint, lpszFormatName: *mut u16, cchMaxCount: c_int) -> c_int;

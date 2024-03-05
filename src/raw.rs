@@ -207,6 +207,22 @@ pub fn is_format_avail(format: c_uint) -> bool {
     unsafe { IsClipboardFormatAvailable(format) != 0 }
 }
 
+#[inline(always)]
+///Returns the first available format in the specified list
+///
+///Returns `None` if no format is available or clipboard is empty
+pub fn which_format_avail(formats: &[c_uint]) -> Option<NonZeroU32> {
+    let result = unsafe {
+        GetPriorityClipboardFormat(formats.as_ptr(), formats.len() as _)
+    };
+    if result < 0 {
+        None
+    } else {
+        NonZeroU32::new(result as _)
+    }
+}
+
+
 #[inline]
 ///Retrieves number of currently available formats on clipboard.
 ///
