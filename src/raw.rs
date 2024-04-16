@@ -122,8 +122,8 @@ pub fn close() -> SysResult<()> {
     //  Impersonate anonymous token while calling CloseClipboard.
     //  This prevents the Windows kernel from capturing the broker's
     //  access token which could lead to potential escalation of privilege.
-    let _ = AnonymousTokenImpersonator::new();
-    
+    let _guard = AnonymousTokenImpersonator::new();
+
     match unsafe { CloseClipboard() } {
         0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
