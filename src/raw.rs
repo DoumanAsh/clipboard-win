@@ -45,6 +45,31 @@ fn free_dc(data: HDC) {
     }
 }
 
+/// A scope guard for impersonating anonymous token on Windows
+struct AnonymousTokenImpersonator {
+    must_revert: bool,
+}
+
+impl AnonymousTokenImpersonator {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            must_revert: unsafe { ImpersonateAnonymousToken(GetCurrentThread()) != 0 },
+        }
+    }
+}
+
+impl Drop for AnonymousTokenImpersonator {
+    #[inline]
+    fn drop(&mut self) {
+        if self.must_revert {
+            unsafe {
+                RevertToSelf();
+            }
+        }
+    }
+}
+
 #[inline(always)]
 ///Opens clipboard.
 ///
@@ -93,6 +118,12 @@ pub fn open_for(owner: HWND) -> SysResult<()> {
 ///
 ///* [open()](fn.open.html) has been called.
 pub fn close() -> SysResult<()> {
+    // See https://crbug.com/441834:
+    //  Impersonate anonymous token while calling CloseClipboard.
+    //  This prevents the Windows kernel from capturing the broker's
+    //  access token which could lead to potential escalation of privilege.
+    let _guard = AnonymousTokenImpersonator::new();
+
     match unsafe { CloseClipboard() } {
         0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
