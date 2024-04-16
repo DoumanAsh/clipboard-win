@@ -46,7 +46,6 @@ extern "system" {
     pub fn GetObjectW(h: HANDLE, c: c_int, pv: *mut c_void) -> c_int;
 }
 
-#[rustfmt::skip]
 #[link(name = "advapi32", kind = "dylib")]
 extern "system" {
     pub fn ImpersonateAnonymousToken(thread_handle: HANDLE) -> BOOL;
