@@ -538,6 +538,15 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
 ///Copies unicode string onto clipboard, performing necessary conversions, returning true on
 ///success.
 pub fn set_string(data: &str) -> SysResult<()> {
+    set_string_(data, true)
+}
+
+///Peforms the same operation as `set_string`, but does not clear the clipboard.
+pub fn set_string_without_clear(data: &str) -> SysResult<()> {
+    set_string_(data, false)
+}
+
+fn set_string_(data: &str, clear: bool) -> SysResult<()> {
     let size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
     };
@@ -554,7 +563,9 @@ pub fn set_string(data: &str) -> SysResult<()> {
             }
         }
 
-        let _ = empty();
+        if clear {
+            let _ = empty();
+        }
 
         if unsafe { !SetClipboardData(formats::CF_UNICODETEXT, mem.get()).is_null() } {
             //SetClipboardData takes ownership
@@ -752,6 +763,15 @@ pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
 ///
 ///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
 pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
+    set_bitmap_(data, true)
+}
+
+///Performs the same operation as `set_bitmap`, but does not clear the clipboard.
+pub fn set_bitmap_without_clear(data: &[u8]) -> SysResult<()> {
+    set_bitmap_(data, false)
+}
+
+fn set_bitmap_(data: &[u8], clear: bool) -> SysResult<()> {
     const FILE_HEADER_LEN: usize = mem::size_of::<BITMAPFILEHEADER>();
     const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
 
@@ -788,7 +808,9 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
         return Err(ErrorCode::last_system());
     }
 
-    let _ = empty();
+    if clear {
+        let _ = empty();
+    }
     if unsafe { SetClipboardData(formats::CF_BITMAP, handle as _).is_null() } {
         return Err(ErrorCode::last_system());
     }
@@ -796,9 +818,18 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
     Ok(())
 }
 
-
 ///Set list of file paths to clipboard.
 pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
+    set_file_list_(paths, true)
+}
+
+///Performs the same operation as `set_file_list`, but does not clear the clipboard.
+pub fn set_file_list_without_clear(paths: &[impl AsRef<str>]) -> SysResult<()> {
+    set_file_list_(paths, false)
+}
+
+///Set list of file paths to clipboard.
+fn set_file_list_(paths: &[impl AsRef<str>], clear: bool) -> SysResult<()> {
     #[repr(C, packed(1))]
     pub struct DROPFILES {
         pub p_files: u32,
@@ -852,7 +883,9 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
         }
     }
 
-    let _ = empty();
+    if clear {
+        let _ = empty();
+    }
 
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
