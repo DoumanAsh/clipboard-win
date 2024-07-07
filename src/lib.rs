@@ -88,6 +88,7 @@ extern crate std;
 
 extern crate alloc;
 
+pub mod options;
 mod sys;
 pub mod types;
 pub mod formats;

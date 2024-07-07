@@ -13,6 +13,7 @@
 use crate::types::*;
 use crate::sys::*;
 use crate::utils::Buffer;
+use crate::options::{self, EmptyFn, Clearing};
 
 const CBM_INIT: DWORD = 0x04;
 const BI_RGB: DWORD = 0;
@@ -384,7 +385,20 @@ pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> 
 }
 
 ///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
+///
+///Allows to customize clipboard setting behavior
+///
+///- `C` - Specifies clearing behavior
+pub fn set_html_with<C: Clearing>(format: u32, html: &str, _is_clear: C) -> SysResult<()> {
+    set_html_inner(format, html, C::EMPTY_FN)
+}
+
+///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
 pub fn set_html(format: u32, html: &str) -> SysResult<()> {
+    set_html_inner(format, html, options::NoClear::EMPTY_FN)
+}
+
+fn set_html_inner(format: u32, html: &str, empty: EmptyFn) -> SysResult<()> {
     const VERSION_VALUE: &str = ":0.9";
     const HEADER_SIZE: usize = html::VERSION.len() + VERSION_VALUE.len() + html::NEWLINE.len()
                                + html::START_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
@@ -459,6 +473,7 @@ pub fn set_html(format: u32, html: &str) -> SysResult<()> {
         debug_assert_eq!(cursor, total_size);
     }
 
+    let _ = (empty)();
     if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
         //SetClipboardData takes ownership
         mem.release();
@@ -468,18 +483,7 @@ pub fn set_html(format: u32, html: &str) -> SysResult<()> {
     }
 }
 
-/// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
-///
-/// This function empties the clipboard before setting the data.
-pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
-    let _ = empty();
-    set_without_clear(format, data)
-}
-
-/// Copies raw bytes onto the clipboard with the specified `format`, returning whether it was successful.
-///
-/// This function does not empty the clipboard before setting the data.
-pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
+fn set_inner(format: u32, data: &[u8], clear: EmptyFn) -> SysResult<()> {
     let size = data.len();
     if size == 0 {
         #[allow(clippy::unit_arg)]
@@ -493,6 +497,7 @@ pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
         unsafe { ptr::copy_nonoverlapping(data.as_ptr(), ptr.as_ptr() as _, size) };
     }
 
+    let _ = (clear)();
     if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
         //SetClipboardData takes ownership
         mem.release();
@@ -500,6 +505,19 @@ pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
     }
 
     Err(ErrorCode::last_system())
+}
+/// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
+///
+/// This function empties the clipboard before setting the data.
+pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
+    set_inner(format, data, options::DoClear::EMPTY_FN)
+}
+
+/// Copies raw bytes onto the clipboard with the specified `format`, returning whether it was successful.
+///
+/// This function does not empty the clipboard before setting the data.
+pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
+    set_inner(format, data, options::NoClear::EMPTY_FN)
 }
 
 ///Copies raw bytes from clipboard with specified `format`, appending to `out` buffer.
@@ -535,9 +553,7 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(result)
 }
 
-///Copies unicode string onto clipboard, performing necessary conversions, returning true on
-///success.
-pub fn set_string(data: &str) -> SysResult<()> {
+fn set_string_inner(data: &str, clear: EmptyFn) -> SysResult<()> {
     let size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
     };
@@ -554,8 +570,7 @@ pub fn set_string(data: &str) -> SysResult<()> {
             }
         }
 
-        let _ = empty();
-
+        let _ = (clear)();
         if unsafe { !SetClipboardData(formats::CF_UNICODETEXT, mem.get()).is_null() } {
             //SetClipboardData takes ownership
             mem.release();
@@ -564,6 +579,24 @@ pub fn set_string(data: &str) -> SysResult<()> {
     }
 
     Err(ErrorCode::last_system())
+}
+
+#[inline(always)]
+///Copies unicode string onto clipboard, performing necessary conversions, returning true on
+///success.
+pub fn set_string(data: &str) -> SysResult<()> {
+    set_string_inner(data, options::DoClear::EMPTY_FN)
+}
+
+#[inline(always)]
+///Copies unicode string onto clipboard, performing necessary conversions, returning true on
+///success.
+///
+///Allows to customize clipboard setting behavior
+///
+///- `C` - Specifies clearing behavior
+pub fn set_string_with<C: Clearing>(data: &str, _is_clear: C) -> SysResult<()> {
+    set_string_inner(data, C::EMPTY_FN)
 }
 
 #[cfg(feature = "std")]
@@ -752,6 +785,24 @@ pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
 ///
 ///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
 pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
+    //Bitmap format cannot really overlap with much so there is no risk of having non-empty clipboard
+    //Also it is backward compatible beahvior.
+    //To be changed in 6.x
+    set_bitmap_inner(data, options::NoClear::EMPTY_FN)
+}
+
+///Sets bitmap (header + RGB) onto clipboard, from raw bytes.
+///
+///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
+///
+///Allows to customize clipboard setting behavior
+///
+///- `C` - Specifies clearing behavior
+pub fn set_bitmap_with<C: Clearing>(data: &[u8], _is_clear: C) -> SysResult<()> {
+    set_bitmap_inner(data, C::EMPTY_FN)
+}
+
+fn set_bitmap_inner(data: &[u8], clear: EmptyFn) -> SysResult<()> {
     const FILE_HEADER_LEN: usize = mem::size_of::<BITMAPFILEHEADER>();
     const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
 
@@ -788,7 +839,7 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
         return Err(ErrorCode::last_system());
     }
 
-    let _ = empty();
+    let _ = (clear)();
     if unsafe { SetClipboardData(formats::CF_BITMAP, handle as _).is_null() } {
         return Err(ErrorCode::last_system());
     }
@@ -797,8 +848,20 @@ pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
 }
 
 
+#[inline(always)]
 ///Set list of file paths to clipboard.
 pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
+    //See set_bitmap for reasoning of NoClear
+    set_file_list_inner(paths, options::NoClear::EMPTY_FN)
+}
+
+#[inline(always)]
+///Set list of file paths to clipboard.
+pub fn set_file_list_with<C: Clearing>(paths: &[impl AsRef<str>], _is_clear: C) -> SysResult<()> {
+    set_file_list_inner(paths, C::EMPTY_FN)
+}
+
+fn set_file_list_inner(paths: &[impl AsRef<str>], empty: EmptyFn) -> SysResult<()> {
     #[repr(C, packed(1))]
     pub struct DROPFILES {
         pub p_files: u32,
@@ -852,8 +915,7 @@ pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
         }
     }
 
-    let _ = empty();
-
+    let _ = (empty)();
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
         mem.release();

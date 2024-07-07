@@ -163,6 +163,7 @@ macro_rules! run {
 
 #[test]
 fn clipboard_should_work() {
+
     run!(should_work_with_bitmap);
     assert!(is_format_avail(CF_BITMAP));
     run!(should_work_with_string);
