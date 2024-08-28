@@ -126,7 +126,7 @@ impl Monitor {
     ///
     ///If `Shutdown` request detected, then return `Ok(false)`
     pub fn recv(&mut self) -> Result<bool, ErrorCode> {
-        for msg in self.iter() {
+        if let Some(msg) = self.iter().next() {
             let msg = msg?;
             match msg.id() {
                 WM_CLIPBOARDUPDATE => return Ok(msg.inner().lParam != CLOSE_PARAM),
