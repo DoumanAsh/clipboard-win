@@ -24,7 +24,7 @@ All read and write access to Windows clipboard requires user to open it.
 ```rust
 use clipboard_win::{Clipboard, formats, Getter, Setter};
 
-const SAMPLE: &str = "MY loli sample ^^";
+const SAMPLE: &str = "My sample ^^";
 
 let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
 formats::Unicode.write_clipboard(&SAMPLE).expect("Write sample");
