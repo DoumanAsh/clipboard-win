@@ -22,36 +22,37 @@ pub fn unlikely_last_error() -> ErrorCode {
 }
 
 #[inline]
-fn noop(_: *mut c_void) {
+fn noop(_: *mut c_void, _: usize) {
 }
 
 #[inline]
-fn free_rust_mem(data: *mut c_void) {
+fn free_rust_mem(data: *mut c_void, size: usize) {
+    let layout = alloc::alloc::Layout::array::<u8>(size).unwrap_or(BYTES_LAYOUT);
     unsafe {
-        alloc::alloc::dealloc(data as _, BYTES_LAYOUT)
+        alloc::alloc::dealloc(data as _, layout)
     }
 }
 
 #[inline]
-fn unlock_data(data: *mut c_void) {
+fn unlock_data(data: *mut c_void, _: usize) {
     unsafe {
         sys::GlobalUnlock(data);
     }
 }
 
 #[inline]
-fn free_global_mem(data: *mut c_void) {
+fn free_global_mem(data: *mut c_void, _: usize) {
     unsafe {
         sys::GlobalFree(data);
     }
 }
 
-pub struct Scope<T: Copy>(pub T, pub fn(T));
+pub struct Scope<T: Copy>(pub T, pub fn(T, usize), pub usize);
 
 impl<T: Copy> Drop for Scope<T> {
     #[inline(always)]
     fn drop(&mut self) {
-        (self.1)(self.0)
+        (self.1)(self.0, self.2)
     }
 }
 
@@ -67,7 +68,7 @@ impl RawMem {
         if mem.is_null() {
             Err(unlikely_last_error())
         } else {
-            Ok(Self(Scope(mem as _, free_rust_mem)))
+            Ok(Self(Scope(mem as _, free_rust_mem, size)))
         }
     }
 
@@ -78,19 +79,24 @@ impl RawMem {
             if mem.is_null() {
                 Err(unlikely_last_error())
             } else {
-                Ok(Self(Scope(mem, free_global_mem)))
+                Ok(Self(Scope(mem, free_global_mem, size)))
             }
         }
     }
 
     #[inline(always)]
     pub fn from_borrowed(ptr: ptr::NonNull<c_void>) -> Self {
-        Self(Scope(ptr.as_ptr(), noop))
+        Self(Scope(ptr.as_ptr(), noop, 0))
     }
 
     #[inline(always)]
     pub fn get(&self) -> *mut c_void {
         (self.0).0
+    }
+
+    #[inline(always)]
+    pub fn size(&self) -> usize {
+        (self.0).2
     }
 
     #[inline(always)]
@@ -104,7 +110,7 @@ impl RawMem {
         };
 
         match ptr::NonNull::new(ptr) {
-            Some(ptr) => Ok((ptr, Scope(self.get(), unlock_data))),
+            Some(ptr) => Ok((ptr, Scope(self.get(), unlock_data, self.size()))),
             None => Err(ErrorCode::last_system()),
         }
     }
