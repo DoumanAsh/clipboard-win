@@ -45,7 +45,7 @@
 //!```
 //!use clipboard_win::{Clipboard, formats, Getter, Setter};
 //!
-//!const SAMPLE: &str = "MY loli sample ^^";
+//!const SAMPLE: &str = "MY smol sample ^^";
 //!
 //!let _clip = Clipboard::new_attempts(10).expect("Open clipboard");
 //!formats::Unicode.write_clipboard(&SAMPLE).expect("Write sample");
