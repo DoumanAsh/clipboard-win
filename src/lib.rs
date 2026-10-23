@@ -155,8 +155,9 @@ impl Clipboard {
                 }
             }
 
-            //0 causes to yield remaining time in scheduler, but remain to be scheduled once again.
-            unsafe { sys::Sleep(0) };
+            //Uses the same value as chrome
+            //https://source.chromium.org/chromium/chromium/src/+/main:ui/base/clipboard/clipboard_win.cc;l=127
+            unsafe { sys::Sleep(5) };
         }
     }
 }
