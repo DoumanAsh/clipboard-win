@@ -231,7 +231,7 @@ impl From<&Bitmap> for u32 {
 #[derive(Copy, Clone)]
 ///HTML Foramt
 ///
-///Reference: https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format
+///Reference: <https://learn.microsoft.com/en-us/windows/win32/dataxchg/html-clipboard-format>
 pub struct Html(NonZeroU32);
 
 impl Html {

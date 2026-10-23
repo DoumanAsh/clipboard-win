@@ -1,5 +1,5 @@
 use clipboard_win::{Getter, Setter, Clipboard, is_format_avail, types};
-use clipboard_win::raw::which_format_avail;
+use clipboard_win::raw::{self, which_format_avail};
 use clipboard_win::formats::{Html, RawData, Unicode, Bitmap, CF_TEXT, CF_UNICODETEXT, CF_BITMAP, FileList, CF_HDROP};
 
 fn should_set_file_list() {
@@ -154,6 +154,22 @@ fn should_set_get_html() {
     assert!(out.is_empty());
 }
 
+fn should_set_get_invalid_html() {
+    let page = "<html><body><!--StartFragment--><b>x</b><!--EndFragment--></body></html>";
+    let payload = format!(
+        "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:{:010}\r\nStartFragment:1000000000\r\nEndFragment:1000000016\r\n{page}",
+        105 + page.len()
+    );
+    let format = raw::register_format("HTML Format").unwrap().get();
+    let _open = Clipboard::new_attempts(10).unwrap();
+    raw::empty().unwrap();
+    raw::set_without_clear(format, payload.as_bytes()).unwrap();
+    let mut out = Vec::new();
+    let error = raw::get_html(format, &mut out).expect_err("invalid data");
+    assert_eq!(error.raw_code(), 13);
+
+}
+
 macro_rules! run {
     ($name:ident) => {
         println!("Clipboard test: {}...", stringify!($name));
@@ -175,4 +191,5 @@ fn clipboard_should_work() {
     run!(should_work_with_set_empty_string);
     run!(should_set_owner);
     run!(should_set_get_html);
+    run!(should_set_get_invalid_html);
 }
